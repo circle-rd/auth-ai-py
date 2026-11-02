@@ -1,0 +1,4 @@
+# Released SDK from PyPI. Inside the repository, install the SDK from source instead
+# (see README.md): `pip install -e "../..[fastapi]" "uvicorn>=0.30,<1"`.
+auth-ai[fastapi]>=0.1,<1
+uvicorn>=0.30,<1

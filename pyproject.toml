@@ -88,6 +88,7 @@ dev = [
   "respx>=0.22",
   "ruff>=0.9",
   "starlette>=0.46",
+  "uvicorn>=0.30",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -140,7 +141,7 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 # The registry mirrors the SDK error codes: DOMAIN_NNN attribute names are the contract.
 "src/auth_ai/errors.py" = ["N815", "N802"]
-"tests/**" = ["S101", "S105", "S106", "S108", "ANN", "PLR", "SLF001", "TRY"]
+"tests/**" = ["S101", "S105", "S106", "S108", "ANN", "PLR", "SLF001", "TRY", "TC", "FBT", "BLE"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["auth_ai"]
@@ -154,7 +155,7 @@ python_version = "3.12"
 strict = true
 warn_unreachable = true
 enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
-files = ["src", "tests"]
+files = ["src", "tests", "examples/minimal/app"]
 plugins = ["pydantic.mypy"]
 
 # Authlib ships no type information.
@@ -179,7 +180,7 @@ source = ["auth_ai"]
 branch = true
 
 [tool.coverage.report]
-fail_under = 90
+fail_under = 95
 show_missing = true
 skip_covered = true
 exclude_also = ["if TYPE_CHECKING:", "\\.\\.\\.$"]

@@ -1,0 +1,91 @@
+name: Release — PyPI
+
+# Creating a GitHub release publishes the package: the release (and its tag
+# vX.Y.Z) is the single trigger. Create it from `main` once the version is set
+# in pyproject.toml. This workflow never creates a release or a tag itself.
+on:
+  release:
+    types: [published]
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Quality gates
+    uses: ./.github/workflows/ci.yml
+
+  build:
+    name: Build the distributions
+    needs: quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Check the release against pyproject.toml
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+          IS_PRERELEASE: ${{ github.event.release.prerelease }}
+        run: |
+          version=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
+          if [ "$TAG" != "v${version}" ]; then
+            echo "::error::The release tag is '${TAG}' but pyproject.toml says '${version}'. Set the version on main, then create the release again."
+            exit 1
+          fi
+          # PEP 440 pre-releases (a, b, rc) and developmental releases (.dev).
+          if echo "$version" | grep -Eq '([0-9](a|b|rc)[0-9]+|\.dev[0-9]+)'; then
+            prerelease=true
+          else
+            prerelease=false
+          fi
+          if [ "$IS_PRERELEASE" != "$prerelease" ]; then
+            echo "::error::Version ${version} must be published as a pre-release=${prerelease} release."
+            exit 1
+          fi
+          if [ "$prerelease" = false ]; then
+            git fetch origin main
+            git merge-base --is-ancestor "$GITHUB_SHA" origin/main || {
+              echo "::error::A stable release must be created from a commit on main."
+              exit 1
+            }
+          fi
+
+      - name: Build
+        run: |
+          pip install build twine
+          python -m build
+          twine check --strict dist/*
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+
+  publish:
+    name: Publish to PyPI
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/auth-ai
+    permissions:
+      # OIDC token for PyPI Trusted Publishing: no long-lived PyPI token is used.
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist/
+
+      - uses: pypa/gh-action-pypi-publish@release/v1

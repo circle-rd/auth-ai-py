@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>auth-ai · minimal example</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <header>
+      <h1>auth-ai minimal example</h1>
+      <div id="session"></div>
+    </header>
+    <main id="app" hidden>
+      <section>
+        <h2>User and entitlements</h2>
+        <pre id="user"></pre>
+      </section>
+      <section>
+        <h2>Wallet</h2>
+        <p id="wallet"></p>
+        <a id="topup" href="#" target="_blank" rel="noopener">Top up</a>
+      </section>
+      <section>
+        <h2>Gateway</h2>
+        <pre id="gateway"></pre>
+      </section>
+      <section>
+        <h2>Chat</h2>
+        <form id="chat">
+          <select name="model" id="chat-model"></select>
+          <input name="message" value="Say hello in five words." />
+          <button>Send</button>
+        </form>
+        <pre id="chat-out"></pre>
+      </section>
+      <section>
+        <h2>Embedding (billed)</h2>
+        <button id="embed">Embed a sentence</button>
+        <pre id="embed-out"></pre>
+      </section>
+      <section>
+        <h2>Consumption</h2>
+        <button id="consume">Report 1 × test.calls</button>
+        <pre id="consume-out"></pre>
+      </section>
+      <section>
+        <h2>Self-test</h2>
+        <button id="selftest">Run every check</button>
+        <pre id="selftest-out"></pre>
+      </section>
+    </main>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

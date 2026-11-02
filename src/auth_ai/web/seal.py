@@ -6,6 +6,7 @@ from typing import Final
 
 from joserfc import jwt
 from joserfc.errors import JoseError
+from joserfc.jwe import JWERegistry
 from joserfc.jwk import OctKey
 from pydantic import BaseModel, ConfigDict, TypeAdapter, ValidationError
 
@@ -13,6 +14,7 @@ from ..errors import ERR
 
 MIN_SECRET_LENGTH: Final = 32
 _ALGORITHMS: Final = ["dir", "A256GCM"]
+_REGISTRY: Final = JWERegistry(algorithms=_ALGORITHMS)
 
 
 def derive_seal_key(secret: str) -> OctKey:
@@ -41,13 +43,15 @@ def seal(key: OctKey, data: object, ttl_seconds: int) -> str:
         {"data": data, "iat": now, "exp": now + ttl_seconds},
         key,
         algorithms=_ALGORITHMS,
+        registry=_REGISTRY,
+        default_type=None,
     )
 
 
 def unseal[T](key: OctKey, token: str, schema: TypeAdapter[T]) -> T:
     """The value of `seal`, validated by `schema`; SES_002 for any tampered or expired token."""
     try:
-        decoded = jwt.decode(token, key, algorithms=_ALGORITHMS)
+        decoded = jwt.decode(token, key, algorithms=_ALGORITHMS, registry=_REGISTRY)
         jwt.JWTClaimsRegistry(exp={"essential": True}).validate(decoded.claims)
         envelope = _Envelope.model_validate(decoded.claims)
         return schema.validate_python(envelope.data)

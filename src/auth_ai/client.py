@@ -155,7 +155,7 @@ class AuthClient:
         endpoint = (await self._provider.get()).metadata.end_session_endpoint
         if not endpoint:
             raise ERR.OIDC_004("The provider advertises no end_session_endpoint")
-        parameters: list[tuple[str, str]] = []
+        parameters: list[tuple[str, str]] = [("client_id", self.config.client_id)]
         if self.config.post_logout_redirect_uri:
             parameters.append(("post_logout_redirect_uri", self.config.post_logout_redirect_uri))
         if id_token_hint:

@@ -130,11 +130,13 @@ class AuthClientConfig(BaseModel):
             raise ERR.CFG_001(f"Invalid SDK configuration: {issues}", cause=err) from err
         if config.gateway_url is None:
             return config
-        return config.model_copy(
-            update={
-                "scopes": tuple(dict.fromkeys([*config.scopes, WALLET_SELF_SCOPE])),
-                "resources": tuple(
-                    dict.fromkeys([*config.resources, config.gateway_url, config.issuer])
-                ),
-            }
+        # Mutated in place: a validator that returns another instance breaks `__init__`.
+        object.__setattr__(
+            config, "scopes", tuple(dict.fromkeys([*config.scopes, WALLET_SELF_SCOPE]))
         )
+        object.__setattr__(
+            config,
+            "resources",
+            tuple(dict.fromkeys([*config.resources, config.gateway_url, config.issuer])),
+        )
+        return config

@@ -1,0 +1,32 @@
+# Deployed behind the shared Traefik, which reaches containers on the `edge` network.
+# The host and the URLs have no default: set them in .env or the shell, see .env.example.
+services:
+  test-app-python:
+    build:
+      context: ${SRC_DIR:-../..}
+      dockerfile: examples/minimal/Dockerfile
+    image: auth-ai-python-example:local
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      PORT: "3000"
+      PUBLIC_URL: https://${APP_HOST:?set APP_HOST}
+      AUTH_ISSUER: ${AUTH_ISSUER:?set AUTH_ISSUER}
+      AUTH_CLIENT_ID: ${AUTH_CLIENT_ID:-test-app-python}
+      GATEWAY_URL: ${GATEWAY_URL:?set GATEWAY_URL}
+    networks:
+      - edge
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=edge
+      - traefik.http.routers.test-app-python.rule=Host(`${APP_HOST:?set APP_HOST}`)
+      - traefik.http.routers.test-app-python.entrypoints=websecure
+      - traefik.http.routers.test-app-python.tls.certresolver=letsencrypt
+      - traefik.http.routers.test-app-python.middlewares=test-app-python-headers
+      - traefik.http.middlewares.test-app-python-headers.headers.stsSeconds=31536000
+      - traefik.http.services.test-app-python.loadbalancer.server.port=3000
+
+networks:
+  edge:
+    name: edge
+    external: true
