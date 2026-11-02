@@ -1,0 +1,17 @@
+{
+    "name": "auth-ai-python-docs",
+    "version": "1.0.0",
+    "private": true,
+    "description": "CIRCLE auth-ai (Python) documentation — Python SDK for applications relying on a CIRCLE auth-service identity provider.",
+    "scripts": {
+        "dev": "nuxt dev",
+        "build": "nuxt build",
+        "generate": "nuxt generate",
+        "preview": "nuxt preview"
+    },
+    "dependencies": {
+        "docus": "5.12.2",
+        "nuxt": "^4.0.0",
+        "better-sqlite3": "^12.2.0"
+    }
+}

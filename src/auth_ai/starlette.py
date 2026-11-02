@@ -91,10 +91,11 @@ def install_auth(app: Starlette, handlers: AuthHandlers) -> None:
     """Serves the sign-in routes of `handlers` on `app` (Starlette or FastAPI).
 
     Also makes `AuthAiError` raised by `require_auth` or by your own routes answer
-    with the public error envelope (code and generic message only).
+    with the public error envelope (code and generic message only); server-side
+    failures reach the handlers' `on_error`.
     """
     app.add_route(f"{handlers.base_path}/{{path:path}}", auth_endpoint(handlers), methods=_METHODS)
-    app.add_exception_handler(AuthAiError, auth_error_handler())
+    app.add_exception_handler(AuthAiError, auth_error_handler(handlers.on_error))
 
 
 def require_auth(handlers: AuthHandlers) -> Callable[[Request], Awaitable[Session]]:

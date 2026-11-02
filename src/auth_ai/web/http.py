@@ -52,9 +52,11 @@ def error_response(
     reported to `on_error` and answered generically.
     """
     if isinstance(err, AuthAiError):
-        return json_response(
-            {"error": err.to_public_json()}, STATUS_BY_CODE.get(err.code, 500), headers
-        )
+        status = STATUS_BY_CODE.get(err.code, 500)
+        # Server-side failures (provider or API down, unexpected answer) need a log line.
+        if status >= 500 and on_error is not None:
+            on_error(err)
+        return json_response({"error": err.to_public_json()}, status, headers)
     if on_error is not None:
         on_error(err)
     return json_response({"error": ERR.SRV_001().to_public_json()}, 500, headers)

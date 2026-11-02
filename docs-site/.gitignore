@@ -1,0 +1,7 @@
+# Nuxt build output and caches
+.nuxt/
+.output/
+.data/
+node_modules/
+dist/
+.env

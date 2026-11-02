@@ -103,10 +103,18 @@ class TestErrorResponse:
         assert response.json() == {"error": {"code": "SRV_001", "message": "Internal error"}}
         assert reported == [failure]
 
-    def test_does_not_report_an_sdk_error_twice(self) -> None:
+    def test_does_not_report_a_client_side_sdk_error(self) -> None:
         reported: list[BaseException] = []
         error_response(ERR.SES_001(), reported.append)
         assert reported == []
+
+    def test_reports_a_server_side_sdk_error_with_its_details(self) -> None:
+        reported: list[BaseException] = []
+        err = ERR.OIDC_001("Discovery failed: connection refused")
+        response = error_response(err, reported.append)
+        assert response.status == 502
+        assert "refused" not in response.body.decode()
+        assert reported == [err]
 
     def test_keeps_the_given_headers_apart(self) -> None:
         headers = [("set-cookie", "a=1"), ("set-cookie", "b=2")]

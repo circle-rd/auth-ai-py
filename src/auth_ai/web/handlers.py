@@ -138,7 +138,7 @@ class AuthHandlers:
         self._require_provider_session = require_provider_session
         self._error_redirect = error_redirect
         self._on_sessions_ended = on_sessions_ended
-        self._on_error = on_error
+        self.on_error = on_error
         #: Origin the SDK builds URLs on: that of `redirect_uri`, never a request header.
         self.origin = f"{redirect.scheme}://{redirect.netloc}"
         self.base_path = base_path
@@ -179,7 +179,7 @@ class AuthHandlers:
         try:
             return await route.run(request)
         except Exception as err:  # noqa: BLE001
-            return error_response(err, self._on_error)
+            return error_response(err, self.on_error)
 
     async def get_session(self, request: WebRequest) -> Session | None:
         """The session of a request, with claims renewed when due; None when signed out."""
@@ -267,8 +267,8 @@ class AuthHandlers:
         )
 
     def _report(self, err: BaseException) -> None:
-        if self._on_error is not None:
-            self._on_error(err)
+        if self.on_error is not None:
+            self.on_error(err)
 
     def _with_cookies(self, *cookies: str) -> list[tuple[str, str]]:
         return [("set-cookie", cookie) for cookie in cookies]
@@ -392,7 +392,7 @@ class AuthHandlers:
     async def _me(self, request: WebRequest) -> WebResponse:
         session = await self.get_session(request)
         if session is None:
-            return error_response(ERR.SES_001(), self._on_error)
+            return error_response(ERR.SES_001(), self.on_error)
         return json_response(
             {
                 "user": to_session_user(session.claims).to_json(),
@@ -402,7 +402,7 @@ class AuthHandlers:
 
     async def _logout(self, request: WebRequest) -> WebResponse:
         if is_cross_site(request, self.origin):
-            return error_response(ERR.SES_004(), self._on_error)
+            return error_response(ERR.SES_004(), self.on_error)
         session = await self._read_session(request)
         logout_url: str | None = None
         if session is not None:
