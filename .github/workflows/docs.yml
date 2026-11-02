@@ -40,5 +40,5 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
-            NUXT_APP_BASE_URL=/auth-ai-py/
-            NUXT_SITE_URL=https://docs.circle-cyber.com/auth-ai-py
+            NUXT_APP_BASE_URL=/auth-ai/python/
+            NUXT_SITE_URL=https://docs.circle-cyber.com/auth-ai/python

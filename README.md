@@ -27,11 +27,11 @@ and call LLMs on their behalf through a [LiteLLM](https://docs.litellm.ai)
 gateway that bills their credit wallet — without writing any OAuth, token
 refresh, logout or billing plumbing yourself.
 
-This is the Python port of [`@circle-rd/auth-ai`](https://github.com/circle-rd/auth-ai):
+This is the Python port of [`@circle-rd/auth-ai`](https://github.com/circle-rd/auth-ai-ts):
 same behaviours, same wire contract, same error codes. A Python backend can serve
 the TypeScript browser client and the React and Vue bindings unchanged.
 
-Full documentation: **https://docs.circle-cyber.com/auth-ai-py/**
+Full documentation: **https://docs.circle-cyber.com/auth-ai/python/**
 
 ```python
 handlers = AuthHandlers(auth=auth, grants=grants, sessions=sessions, secret=secret, ai=ai)
@@ -274,7 +274,7 @@ The SDK is storage-agnostic on purpose. Before going live:
 ## Documentation
 
 The full documentation is published at
-[docs.circle-cyber.com/auth-ai-py](https://docs.circle-cyber.com/auth-ai-py/):
+[docs.circle-cyber.com/auth-ai/python](https://docs.circle-cyber.com/auth-ai/python/):
 concepts, one guide per framework, the configuration and API reference, the
 error-code registry and a production checklist.
 
@@ -283,7 +283,7 @@ error-code registry and a production checklist.
 
 | Environment | MCP endpoint                                                           |
 | ----------- | ---------------------------------------------------------------------- |
-| Production  | `https://docs.circle-cyber.com/auth-ai-py/mcp`                     |
+| Production  | `https://docs.circle-cyber.com/auth-ai/python/mcp`                     |
 | Local dev   | `http://localhost:3000/mcp` (run `npm run dev` in `docs-site/`)        |
 
 **Contributing** — the development rules in [AGENTS.md](AGENTS.md) (naming,

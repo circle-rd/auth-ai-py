@@ -72,7 +72,7 @@ fastapi = ["fastapi>=0.115"]
 
 [project.urls]
 Homepage = "https://github.com/circle-rd/auth-ai-py"
-Documentation = "https://docs.circle-cyber.com/auth-ai-py"
+Documentation = "https://docs.circle-cyber.com/auth-ai/python"
 Repository = "https://github.com/circle-rd/auth-ai-py"
 Issues = "https://github.com/circle-rd/auth-ai-py/issues"
 Changelog = "https://github.com/circle-rd/auth-ai-py/blob/main/CHANGELOG.md"

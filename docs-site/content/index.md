@@ -9,11 +9,15 @@ seo:
 CIRCLE auth-ai (Python)
 
 #description
-A Python SDK for applications that sign their users in through a [CIRCLE auth-service](https://docs.circle-cyber.com/auth-service/). Run the OIDC flow on your asyncio backend, keep tokens off the browser, read roles and plan features, and let users call LLMs through the LiteLLM gateway against their credit wallet. It is the Python port of the [TypeScript SDK](https://docs.circle-cyber.com/auth-ai/), with the same wire contract.
+A Python SDK for applications that sign their users in through a [CIRCLE auth-service](https://docs.circle-cyber.com/auth-service/). Run the OIDC flow on your asyncio backend, keep tokens off the browser, read roles and plan features, and let users call LLMs through the LiteLLM gateway against their credit wallet. It is the Python port of the [TypeScript SDK](https://docs.circle-cyber.com/auth-ai/typescript/), with the same wire contract.
 
 #links
 ::::u-button{to="/docs/getting-started/introduction" size="xl" trailing-icon="i-lucide-arrow-right" color="neutral"}
 Get started
+::::
+
+::::u-button{to="https://docs.circle-cyber.com/auth-ai/typescript/" size="xl" variant="outline" color="neutral" icon="i-simple-icons-typescript"}
+TypeScript SDK
 ::::
 
 ::::u-button{to="https://github.com/circle-rd/auth-ai-py" target="_blank" size="xl" variant="outline" color="neutral" icon="i-simple-icons-github"}

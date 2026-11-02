@@ -5,9 +5,9 @@ description: "Use when: integrating, configuring or troubleshooting auth-ai (PyP
 
 # CIRCLE auth-ai (Python)
 
-Python SDK (`auth-ai` on PyPI, imported as `auth_ai`, MIT, Python >= 3.12, async only) for applications that rely on a CIRCLE auth-service identity provider. It is the Python port of the TypeScript SDK `@circle-rd/auth-ai` (documented at https://docs.circle-cyber.com/auth-ai/) and shares its wire contract: the BFF routes, the sealed login cookie, the cookie names and the error codes.
+Python SDK (`auth-ai` on PyPI, imported as `auth_ai`, MIT, Python >= 3.12, async only) for applications that rely on a CIRCLE auth-service identity provider. It is the Python port of the TypeScript SDK `@circle-rd/auth-ai` (documented at https://docs.circle-cyber.com/auth-ai/typescript/) and shares its wire contract: the BFF routes, the sealed login cookie, the cookie names and the error codes.
 
-Full documentation: https://docs.circle-cyber.com/auth-ai-py/ . Every page is also served as markdown under `/raw/`, for example https://docs.circle-cyber.com/auth-ai-py/raw/docs/concepts/architecture.md ; the whole text is at https://docs.circle-cyber.com/auth-ai-py/llms-full.txt and a page index at https://docs.circle-cyber.com/auth-ai-py/llms.txt . The documentation also exposes an MCP server at https://docs.circle-cyber.com/auth-ai-py/mcp . Version 0.x: the API is not stable.
+Full documentation: https://docs.circle-cyber.com/auth-ai/python/ . Every page is also served as markdown under `/raw/`, for example https://docs.circle-cyber.com/auth-ai/python/raw/docs/concepts/architecture.md ; the whole text is at https://docs.circle-cyber.com/auth-ai/python/llms-full.txt and a page index at https://docs.circle-cyber.com/auth-ai/python/llms.txt . The documentation also exposes an MCP server at https://docs.circle-cyber.com/auth-ai/python/mcp . Version 0.x: the API is not stable.
 
 It is built for auth-service. It is not a client for arbitrary OIDC providers and not an identity provider. It has no debit API (the LiteLLM gateway debits the wallet), no Django or Flask adapter yet, no synchronous facade, and no frontend code: pair it with the TypeScript browser client and React/Vue bindings of `@circle-rd/auth-ai`.
 
@@ -112,4 +112,4 @@ Close the client at shutdown with `await auth.aclose()` (or `async with AuthClie
 | `GW_001` | Wallet empty (402): send the user to `wallet.topup_url()`. |
 | `GW_003` | Gateway refused credentials or resource (401/403): check LiteLLM support and the user's plan. |
 
-More: https://docs.circle-cyber.com/auth-ai-py/docs/reference/error-codes
+More: https://docs.circle-cyber.com/auth-ai/python/docs/reference/error-codes
