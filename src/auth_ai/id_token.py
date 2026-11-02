@@ -29,7 +29,7 @@ def check_id_token_binding(
     audience = claims.get("aud")
     sole_audience = audience in (client_id, [client_id])
     authorized_party = claims.get("azp")
-    if authorized_party is None:
+    if "azp" not in claims:
         if not sole_audience:
             raise ERR.TOK_001("The ID token lacks azp", details={"reason": "missing_azp"})
     elif authorized_party != client_id:
