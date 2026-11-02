@@ -19,7 +19,6 @@ PROVIDER_TTL_SECONDS: Final = 3600.0
 
 ASYMMETRIC_ALGORITHMS: Final = frozenset(
     {
-        "EdDSA",
         "Ed25519",
         "Ed448",
         "ES256",

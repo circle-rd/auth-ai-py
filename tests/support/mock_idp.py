@@ -4,15 +4,13 @@ from __future__ import annotations
 
 import inspect
 import time
-import warnings
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any
 
 import httpx
 from joserfc import jwt
-from joserfc.errors import SecurityWarning
-from joserfc.jwk import OKPKey
+from joserfc.jwk import ECKey
 
 from auth_ai import AuthClient, AuthClientConfig
 
@@ -51,16 +49,14 @@ def now_seconds() -> int:
     return int(time.time())
 
 
-def sign(claims: dict[str, Any], key: OKPKey, *, typ: str | None = None, kid: str = "key-1") -> str:
-    header = {"alg": "EdDSA", "kid": kid, **({"typ": typ} if typ else {})}
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", SecurityWarning)
-        return jwt.encode(header, claims, key, algorithms=["EdDSA"])
+def sign(claims: dict[str, Any], key: ECKey, *, typ: str | None = None, kid: str = "key-1") -> str:
+    header = {"alg": "ES256", "kid": kid, **({"typ": typ} if typ else {})}
+    return jwt.encode(header, claims, key, algorithms=["ES256"])
 
 
 @dataclass
 class MockIdp:
-    private_key: OKPKey
+    private_key: ECKey
     metadata: dict[str, Any]
     requests: list[RecordedRequest] = field(default_factory=list)
     token_handler: Handler = lambda _request: json_response({"error": "server_error"}, 500)
@@ -81,7 +77,7 @@ class MockIdp:
         claims: dict[str, Any],
         *,
         typ: str | None = None,
-        key: OKPKey | None = None,
+        key: ECKey | None = None,
         kid: str = "key-1",
     ) -> str:
         return sign(claims, key or self.private_key, typ=typ, kid=kid)
@@ -100,8 +96,8 @@ class MockIdp:
         )
 
     @staticmethod
-    def generate_foreign_key() -> OKPKey:
-        return OKPKey.generate_key("Ed25519", parameters={"kid": "key-1"})
+    def generate_foreign_key() -> ECKey:
+        return ECKey.generate_key("P-256", parameters={"kid": "key-1"})
 
     def requests_to(self, path: str) -> list[RecordedRequest]:
         return [request for request in self.requests if request.url.path == path]
@@ -110,7 +106,7 @@ class MockIdp:
     def jwks(self) -> dict[str, Any]:
         if self.jwks_overrides is not None:
             return {"keys": self.jwks_overrides}
-        return {"keys": [self.private_key.as_dict(private=False, alg="EdDSA")]}
+        return {"keys": [self.private_key.as_dict(private=False, alg="ES256")]}
 
     async def handle(self, request: httpx.Request) -> httpx.Response:
         recorded = RecordedRequest(request.method, request.url, request.headers, request.read())
@@ -148,7 +144,7 @@ async def _call(handler: Handler, request: RecordedRequest) -> httpx.Response:
 
 
 def create_mock_idp() -> MockIdp:
-    key = OKPKey.generate_key("Ed25519", parameters={"kid": "key-1"})
+    key = ECKey.generate_key("P-256", parameters={"kid": "key-1"})
     metadata = {
         "issuer": ISSUER,
         "authorization_endpoint": f"{ISSUER}/authorize",
@@ -159,7 +155,7 @@ def create_mock_idp() -> MockIdp:
         "end_session_endpoint": f"{ISSUER}/end-session",
         "response_types_supported": ["code"],
         "subject_types_supported": ["public"],
-        "id_token_signing_alg_values_supported": ["EdDSA"],
+        "id_token_signing_alg_values_supported": ["ES256"],
         "code_challenge_methods_supported": ["S256"],
         "grant_types_supported": ["authorization_code", "refresh_token"],
         "token_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post"],

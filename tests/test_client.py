@@ -127,6 +127,12 @@ class TestDiscovery:
         idp.metadata["id_token_signing_alg_values_supported"] = ["HS256"]
         await expect_error(auth.start_login(), "OIDC_001")
 
+    async def test_rejects_a_provider_advertising_only_the_deprecated_eddsa(
+        self, auth: AuthClient, idp: MockIdp
+    ) -> None:
+        idp.metadata["id_token_signing_alg_values_supported"] = ["EdDSA"]
+        await expect_error(auth.start_login(), "OIDC_001")
+
     async def test_rejects_a_document_naming_another_issuer(
         self, auth: AuthClient, idp: MockIdp
     ) -> None:
@@ -572,8 +578,8 @@ class TestVerifyJwt:
             kid="key-2",
         )
         idp.jwks_overrides = [
-            idp.private_key.as_dict(private=False, alg="EdDSA"),
-            {**rotated.as_dict(private=False, alg="EdDSA"), "kid": "key-2"},
+            idp.private_key.as_dict(private=False, alg="ES256"),
+            {**rotated.as_dict(private=False, alg="ES256"), "kid": "key-2"},
         ]
 
         await expect_error(auth.verify_jwt(token, audience=CLIENT_ID), "TOK_001")

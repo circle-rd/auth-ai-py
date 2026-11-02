@@ -2,13 +2,12 @@ from __future__ import annotations
 
 import asyncio
 import time
-import warnings
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Final
 
 import httpx
 from joserfc import jwt
-from joserfc.errors import JoseError, SecurityWarning
+from joserfc.errors import JoseError
 from joserfc.jwk import KeySet
 from joserfc.jws import extract_compact
 
@@ -20,12 +19,6 @@ if TYPE_CHECKING:
 # Re-fetch an unknown `kid` (key rotation) at most once per cooldown.
 JWKS_COOLDOWN_SECONDS: Final = 30.0
 JWKS_MAX_AGE_SECONDS: Final = 3600.0
-
-# auth-service signs with EdDSA, which RFC 9864 deprecates in favour of the
-# fully specified Ed25519 and Ed448 (accepted as well): joserfc warns on each
-# verification, which is noise for a provider's choice. Revisit when auth-service
-# moves to a fully specified algorithm.
-_EDDSA_WARNING: Final = "EdDSA is deprecated"
 
 
 @dataclass(frozen=True, slots=True)
@@ -118,9 +111,7 @@ class JwtVerifier:
         try:
             kid = extract_compact(token.encode()).headers().get("kid")
             keys = await self._jwks.get(kid if isinstance(kid, str) else None)
-            with warnings.catch_warnings():
-                warnings.filterwarnings("ignore", message=_EDDSA_WARNING, category=SecurityWarning)
-                decoded = jwt.decode(token, keys, algorithms=self._algorithms)
+            decoded = jwt.decode(token, keys, algorithms=self._algorithms)
             jwt.JWTClaimsRegistry(
                 leeway=self._leeway,
                 iss={"essential": True, "value": self._issuer},

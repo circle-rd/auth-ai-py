@@ -146,9 +146,9 @@ src/auth_ai/
 - State-changing requests carrying the session cookie are refused when cross-site.
 - The token supplied to the gateway is only ever sent to the gateway's origin.
 - A failed sign-in callback answers one generic `403 SES_005`; the cause goes to `on_error`.
-- `joserfc` warns that `EdDSA` is deprecated (RFC 9864) while auth-service signs with it:
-  the warning is silenced for that one message inside `JwtVerifier`. Revisit when
-  auth-service issues `Ed25519` tokens (both names are already accepted).
+- `EdDSA` is not an accepted algorithm: RFC 9864 deprecates that name. A provider that
+  only advertises it fails discovery (`OIDC_001`); the fully specified `Ed25519` and
+  `Ed448` are accepted.
 - Keep dependencies current and review advisories before upgrading. Do not add a
   dependency for what a few idiomatic lines do.
 

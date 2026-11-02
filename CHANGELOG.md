@@ -51,6 +51,10 @@ wire contract and error codes.
   stay in the application's logs.
 - `__Host-` cookies, same-origin redirect targets, refused cross-site logout, URLs built
   on the registered origin, client credentials form-urlencoded per RFC 6749 §2.3.1.
+- JWTs signed with `EdDSA` are refused: RFC 9864 deprecates that algorithm name. The
+  fully specified `Ed25519` and `Ed448` are accepted, next to the ES\*, RS\* and PS\*
+  families (auth-service signs with ES256).
+- A server-side failure (5xx answer) of the sign-in routes is reported to `on_error`.
 
 [Unreleased]: https://github.com/circle-rd/auth-ai-python/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/circle-rd/auth-ai-python/releases/tag/v0.1.0

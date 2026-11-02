@@ -1,5 +1,5 @@
 ---
-name: auth-ai
+name: auth-ai-py
 description: "Use when: integrating, configuring or troubleshooting auth-ai (PyPI package `auth-ai`, imported as `auth_ai`), the Python SDK for asyncio backends that sign users in through a CIRCLE auth-service (backend-for-frontend OIDC sign-in with FastAPI, Starlette or framework-agnostic handlers, bearer token verification, back-channel logout, wallet, LiteLLM gateway, billing and consumption), or when an AuthAiError code such as SES_005, TOK_002 or GW_001 appears."
 ---
 
