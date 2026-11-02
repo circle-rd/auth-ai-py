@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/circle-rd/auth-ai-python/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/circle-rd/auth-ai-python/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://github.com/circle-rd/auth-ai-py/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/circle-rd/auth-ai-py/actions/workflows/ci.yml/badge.svg"></a>
   <a href="https://pypi.org/project/auth-ai/"><img alt="PyPI" src="https://img.shields.io/pypi/v/auth-ai?logo=pypi&logoColor=white"></a>
   <a href="https://pypi.org/project/auth-ai/"><img alt="Python" src="https://img.shields.io/pypi/pyversions/auth-ai?logo=python&logoColor=white"></a>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-blue.svg"></a>
@@ -27,11 +27,11 @@ and call LLMs on their behalf through a [LiteLLM](https://docs.litellm.ai)
 gateway that bills their credit wallet — without writing any OAuth, token
 refresh, logout or billing plumbing yourself.
 
-This is the Python port of [`@circle-rd/auth-ai`](https://github.com/circle-rd/auth-ai):
+This is the Python port of [`@circle-rd/auth-ai`](https://github.com/circle-rd/auth-ai-ts):
 same behaviours, same wire contract, same error codes. A Python backend can serve
 the TypeScript browser client and the React and Vue bindings unchanged.
 
-Full documentation: **https://docs.circle-cyber.com/auth-ai-python/**
+Full documentation: **https://docs.circle-cyber.com/auth-ai/python/**
 
 ```python
 handlers = AuthHandlers(auth=auth, grants=grants, sessions=sessions, secret=secret, ai=ai)
@@ -45,9 +45,10 @@ async def models(session: Session = Depends(require_auth(handlers))):
 
 ## Principles
 
-- **Do not reinvent OAuth.** Protocol work stays with the maintained libraries
-  [Authlib](https://authlib.org) and [joserfc](https://jose.authlib.org); the SDK
-  adds what is specific to auth-service on top of them.
+- **Do not reinvent OAuth or JOSE.** Signature, JWT and cookie encryption work stays
+  with the maintained library [joserfc](https://jose.authlib.org) and HTTP with
+  [httpx](https://www.python-httpx.org); the SDK adds what is specific to auth-service
+  on top of them. The declared direct runtime dependencies are licensed under BSD-3-Clause or MIT.
 - **Backend-for-frontend by default.** The browser holds one opaque session
   cookie. Access and refresh tokens never reach it.
 - **Fail loud, leak nothing.** Invalid state is rejected, not repaired. Errors
@@ -232,7 +233,7 @@ sequenceDiagram
 ```
 
 ```
-auth-ai-python/
+auth-ai-py/
 ├── 📁 src/auth_ai/
 │   ├── client.py          AuthClient — discovery, PKCE login, refresh, logout, revoke, introspect
 │   ├── config.py          Validated configuration (gateway_url adds the gateway audiences)
@@ -273,7 +274,7 @@ The SDK is storage-agnostic on purpose. Before going live:
 ## Documentation
 
 The full documentation is published at
-[docs.circle-cyber.com/auth-ai-python](https://docs.circle-cyber.com/auth-ai-python/):
+[docs.circle-cyber.com/auth-ai/python](https://docs.circle-cyber.com/auth-ai/python/):
 concepts, one guide per framework, the configuration and API reference, the
 error-code registry and a production checklist.
 
@@ -282,7 +283,7 @@ error-code registry and a production checklist.
 
 | Environment | MCP endpoint                                                           |
 | ----------- | ---------------------------------------------------------------------- |
-| Production  | `https://docs.circle-cyber.com/auth-ai-python/mcp`                     |
+| Production  | `https://docs.circle-cyber.com/auth-ai/python/mcp`                     |
 | Local dev   | `http://localhost:3000/mcp` (run `npm run dev` in `docs-site/`)        |
 
 **Contributing** — the development rules in [AGENTS.md](AGENTS.md) (naming,
@@ -300,7 +301,7 @@ Security reports: see [SECURITY.md](SECURITY.md). Releases are tracked in
 ## Credits & license
 
 Built and maintained by [CIRCLE](https://circle-cyber.com). Stands on the
-shoulders of [Authlib](https://authlib.org), [joserfc](https://jose.authlib.org),
+shoulders of [joserfc](https://jose.authlib.org),
 [httpx](https://www.python-httpx.org), [pydantic](https://docs.pydantic.dev) and
 [Starlette](https://www.starlette.io).
 

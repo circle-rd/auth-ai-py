@@ -13,10 +13,10 @@ export default defineAppConfig({
     },
   },
   socials: {
-    github: "https://github.com/circle-rd/auth-ai-python",
+    github: "https://github.com/circle-rd/auth-ai-py",
   },
   github: {
-    url: "https://github.com/circle-rd/auth-ai-python",
+    url: "https://github.com/circle-rd/auth-ai-py",
     branch: "main",
     rootDir: "docs-site",
   },

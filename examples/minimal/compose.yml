@@ -5,7 +5,7 @@ services:
     build:
       context: ${SRC_DIR:-../..}
       dockerfile: examples/minimal/Dockerfile
-    image: auth-ai-python-example:local
+    image: auth-ai-py-example:local
     restart: unless-stopped
     env_file: .env
     environment:

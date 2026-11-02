@@ -1,19 +1,19 @@
 from __future__ import annotations
 
+import base64
+import hashlib
 import hmac
+import secrets
 from typing import TYPE_CHECKING, Any, Self
 from urllib.parse import parse_qs, urlencode, urlsplit, urlunsplit
 
 import httpx
-from authlib.common.security import generate_token
-from authlib.oauth2.rfc7636 import create_s256_code_challenge
-from authlib.oidc.core import CodeIDToken
-from joserfc.errors import JoseError
 from pydantic import ValidationError
 
 from .claims import IdTokenClaims
 from .config import AuthClientConfig
 from .errors import ERR
+from .id_token import check_id_token_binding
 from .introspection import IntrospectionResult
 from .provider import Provider, ProviderLoader
 from .token_endpoint import ProviderEndpoints
@@ -30,8 +30,13 @@ if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
     from types import TracebackType
 
-_PKCE_VERIFIER_LENGTH = 64
-_RANDOM_LENGTH = 32
+_PKCE_VERIFIER_BYTES = 48
+_RANDOM_BYTES = 32
+
+
+def _s256_challenge(code_verifier: str) -> str:
+    digest = hashlib.sha256(code_verifier.encode("ascii")).digest()
+    return base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
 
 
 class AuthClient:
@@ -85,9 +90,9 @@ class AuthClient:
     ) -> LoginRequest:
         provider = await self._provider.get()
         handshake = LoginHandshake(
-            state=generate_token(_RANDOM_LENGTH),
-            nonce=generate_token(_RANDOM_LENGTH),
-            code_verifier=generate_token(_PKCE_VERIFIER_LENGTH),
+            state=secrets.token_urlsafe(_RANDOM_BYTES),
+            nonce=secrets.token_urlsafe(_RANDOM_BYTES),
+            code_verifier=secrets.token_urlsafe(_PKCE_VERIFIER_BYTES),
         )
         parameters: list[tuple[str, str]] = [
             ("response_type", "code"),
@@ -96,7 +101,7 @@ class AuthClient:
             ("scope", " ".join(self.config.scopes)),
             ("state", handshake.state),
             ("nonce", handshake.nonce),
-            ("code_challenge", create_s256_code_challenge(handshake.code_verifier)),
+            ("code_challenge", _s256_challenge(handshake.code_verifier)),
             ("code_challenge_method", "S256"),
         ]
         if prompt:
@@ -225,19 +230,9 @@ class AuthClient:
         self, provider: Provider, id_token: str, *, nonce: str | None = None
     ) -> IdTokenClaims:
         verified = await provider.jwt.verify(id_token, audience=self.config.client_id)
+        check_id_token_binding(verified.claims, client_id=self.config.client_id, nonce=nonce)
         try:
-            CodeIDToken(
-                verified.claims,
-                verified.header,
-                params={"nonce": nonce, "client_id": self.config.client_id},
-            ).validate(leeway=self.config.clock_tolerance_seconds)
             return IdTokenClaims.model_validate(verified.claims)
-        except JoseError as err:
-            raise ERR.TOK_001(
-                f"ID token validation failed: {err.error}",
-                details={"reason": err.error},
-                cause=err,
-            ) from err
         except ValidationError as err:
             raise ERR.TOK_001("The ID token claims have an unexpected shape", cause=err) from err
 

@@ -64,16 +64,17 @@ shared and must stay aligned.
 | Layer       | Technology                                                       |
 | ----------- | ---------------------------------------------------------------- |
 | Runtime     | Python 3.12+ (3.12, 3.13, 3.14 tested), asyncio only             |
-| OIDC / JOSE | `authlib` (PKCE and ID token claim validation) + `joserfc` (JWT, JWE) |
+| JOSE        | `joserfc` (JWT verification, JWE) — the OIDC steps around it are in the SDK |
 | HTTP        | `httpx`                                                          |
 | Validation  | pydantic v2                                                      |
 | Frameworks  | Starlette / FastAPI (optional extras)                            |
 | Testing     | pytest, pytest-asyncio, a scripted mock identity provider        |
 | Tooling     | ruff, mypy (strict), hatchling                                   |
 
-**Do not reimplement what Authlib or joserfc already do.** The token endpoint exchange
-is deliberately thin and stateless: Authlib's `AsyncOAuth2Client` keeps the last token on
-the instance, which is unsafe to share between concurrent users.
+**Do not reimplement what joserfc or httpx already do.** The OAuth token endpoint exchange
+is small and written here on purpose, stateless: it is shared by concurrent users, which
+rules out the stateful OAuth clients of the popular libraries (they keep the last token
+on the instance). Keep every runtime dependency permissively licensed (BSD, MIT, Apache).
 
 ## 2. Language and naming
 
