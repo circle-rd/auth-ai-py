@@ -61,7 +61,6 @@ classifiers = [
   "Typing :: Typed",
 ]
 dependencies = [
-  "authlib>=1.9",
   "httpx>=0.28",
   "joserfc>=1.7",
   "pydantic>=2.12",
@@ -157,11 +156,6 @@ warn_unreachable = true
 enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
 files = ["src", "tests", "examples/minimal/app"]
 plugins = ["pydantic.mypy"]
-
-# Authlib ships no type information.
-[[tool.mypy.overrides]]
-module = ["authlib.*"]
-ignore_missing_imports = true
 
 [tool.pydantic-mypy]
 init_forbid_extra = true

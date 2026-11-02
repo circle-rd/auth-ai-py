@@ -45,9 +45,10 @@ async def models(session: Session = Depends(require_auth(handlers))):
 
 ## Principles
 
-- **Do not reinvent OAuth.** Protocol work stays with the maintained libraries
-  [Authlib](https://authlib.org) and [joserfc](https://jose.authlib.org); the SDK
-  adds what is specific to auth-service on top of them.
+- **Do not reinvent OAuth or JOSE.** Signature, JWT and cookie encryption work stays
+  with the maintained library [joserfc](https://jose.authlib.org) and HTTP with
+  [httpx](https://www.python-httpx.org); the SDK adds what is specific to auth-service
+  on top of them. Every runtime dependency is permissively licensed (BSD-3-Clause or MIT).
 - **Backend-for-frontend by default.** The browser holds one opaque session
   cookie. Access and refresh tokens never reach it.
 - **Fail loud, leak nothing.** Invalid state is rejected, not repaired. Errors
@@ -300,7 +301,7 @@ Security reports: see [SECURITY.md](SECURITY.md). Releases are tracked in
 ## Credits & license
 
 Built and maintained by [CIRCLE](https://circle-cyber.com). Stands on the
-shoulders of [Authlib](https://authlib.org), [joserfc](https://jose.authlib.org),
+shoulders of [joserfc](https://jose.authlib.org),
 [httpx](https://www.python-httpx.org), [pydantic](https://docs.pydantic.dev) and
 [Starlette](https://www.starlette.io).
 
