@@ -11,7 +11,7 @@ version is `0`, upgrade to the newest `0.x` release to get them.
 ## Reporting a vulnerability
 
 **Do not open a public issue.** Report it privately through GitHub:
-[Report a vulnerability](https://github.com/circle-rd/auth-ai-python/security/advisories/new).
+[Report a vulnerability](https://github.com/circle-rd/auth-ai-py/security/advisories/new).
 
 Please include the affected version, the module involved (`auth_ai.web`,
 `auth_ai.server`, `auth_ai.starlette`…), a minimal reproduction, and the impact you see.

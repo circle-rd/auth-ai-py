@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/circle-rd/auth-ai-python/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/circle-rd/auth-ai-python/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://github.com/circle-rd/auth-ai-py/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/circle-rd/auth-ai-py/actions/workflows/ci.yml/badge.svg"></a>
   <a href="https://pypi.org/project/auth-ai/"><img alt="PyPI" src="https://img.shields.io/pypi/v/auth-ai?logo=pypi&logoColor=white"></a>
   <a href="https://pypi.org/project/auth-ai/"><img alt="Python" src="https://img.shields.io/pypi/pyversions/auth-ai?logo=python&logoColor=white"></a>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-blue.svg"></a>
@@ -31,7 +31,7 @@ This is the Python port of [`@circle-rd/auth-ai`](https://github.com/circle-rd/a
 same behaviours, same wire contract, same error codes. A Python backend can serve
 the TypeScript browser client and the React and Vue bindings unchanged.
 
-Full documentation: **https://docs.circle-cyber.com/auth-ai-python/**
+Full documentation: **https://docs.circle-cyber.com/auth-ai-py/**
 
 ```python
 handlers = AuthHandlers(auth=auth, grants=grants, sessions=sessions, secret=secret, ai=ai)
@@ -233,7 +233,7 @@ sequenceDiagram
 ```
 
 ```
-auth-ai-python/
+auth-ai-py/
 ├── 📁 src/auth_ai/
 │   ├── client.py          AuthClient — discovery, PKCE login, refresh, logout, revoke, introspect
 │   ├── config.py          Validated configuration (gateway_url adds the gateway audiences)
@@ -274,7 +274,7 @@ The SDK is storage-agnostic on purpose. Before going live:
 ## Documentation
 
 The full documentation is published at
-[docs.circle-cyber.com/auth-ai-python](https://docs.circle-cyber.com/auth-ai-python/):
+[docs.circle-cyber.com/auth-ai-py](https://docs.circle-cyber.com/auth-ai-py/):
 concepts, one guide per framework, the configuration and API reference, the
 error-code registry and a production checklist.
 
@@ -283,7 +283,7 @@ error-code registry and a production checklist.
 
 | Environment | MCP endpoint                                                           |
 | ----------- | ---------------------------------------------------------------------- |
-| Production  | `https://docs.circle-cyber.com/auth-ai-python/mcp`                     |
+| Production  | `https://docs.circle-cyber.com/auth-ai-py/mcp`                     |
 | Local dev   | `http://localhost:3000/mcp` (run `npm run dev` in `docs-site/`)        |
 
 **Contributing** — the development rules in [AGENTS.md](AGENTS.md) (naming,

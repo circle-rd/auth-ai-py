@@ -71,11 +71,11 @@ starlette = ["starlette>=0.46"]
 fastapi = ["fastapi>=0.115"]
 
 [project.urls]
-Homepage = "https://github.com/circle-rd/auth-ai-python"
-Documentation = "https://docs.circle-cyber.com/auth-ai-python"
-Repository = "https://github.com/circle-rd/auth-ai-python"
-Issues = "https://github.com/circle-rd/auth-ai-python/issues"
-Changelog = "https://github.com/circle-rd/auth-ai-python/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/circle-rd/auth-ai-py"
+Documentation = "https://docs.circle-cyber.com/auth-ai-py"
+Repository = "https://github.com/circle-rd/auth-ai-py"
+Issues = "https://github.com/circle-rd/auth-ai-py/issues"
+Changelog = "https://github.com/circle-rd/auth-ai-py/blob/main/CHANGELOG.md"
 
 [dependency-groups]
 dev = [

@@ -1,5 +1,5 @@
 {
-    "name": "auth-ai-python-docs",
+    "name": "auth-ai-py-docs",
     "version": "1.0.0",
     "private": true,
     "description": "CIRCLE auth-ai (Python) documentation — Python SDK for applications relying on a CIRCLE auth-service identity provider.",

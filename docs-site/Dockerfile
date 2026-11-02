@@ -2,8 +2,8 @@
 FROM node:24-alpine AS builder
 WORKDIR /app
 RUN apk add --no-cache python3 make g++
-ARG NUXT_APP_BASE_URL=/auth-ai-python/
-ARG NUXT_SITE_URL=https://docs.circle-cyber.com/auth-ai-python
+ARG NUXT_APP_BASE_URL=/auth-ai-py/
+ARG NUXT_SITE_URL=https://docs.circle-cyber.com/auth-ai-py
 ENV NUXT_APP_BASE_URL=${NUXT_APP_BASE_URL}
 ENV NUXT_SITE_URL=${NUXT_SITE_URL}
 COPY package.json ./
@@ -15,8 +15,8 @@ RUN npx nuxt build
 FROM node:24-alpine
 WORKDIR /app
 COPY --from=builder /app/.output ./.output
-ARG NUXT_APP_BASE_URL=/auth-ai-python/
-ARG NUXT_SITE_URL=https://docs.circle-cyber.com/auth-ai-python
+ARG NUXT_APP_BASE_URL=/auth-ai-py/
+ARG NUXT_SITE_URL=https://docs.circle-cyber.com/auth-ai-py
 ENV HOST=0.0.0.0
 ENV PORT=3000
 ENV NODE_ENV=production

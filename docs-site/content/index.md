@@ -16,7 +16,7 @@ A Python SDK for applications that sign their users in through a [CIRCLE auth-se
 Get started
 ::::
 
-::::u-button{to="https://github.com/circle-rd/auth-ai-python" target="_blank" size="xl" variant="outline" color="neutral" icon="i-simple-icons-github"}
+::::u-button{to="https://github.com/circle-rd/auth-ai-py" target="_blank" size="xl" variant="outline" color="neutral" icon="i-simple-icons-github"}
 GitHub
 ::::
 :::

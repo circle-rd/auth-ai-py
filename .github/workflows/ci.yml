@@ -105,8 +105,11 @@ jobs:
         with:
           python-version: "3.12"
 
+      # The vulnerabilities pip-audit found came from the pip bundled with the
+      # runner's Python, not from what the package ships: audit a current pip.
       - name: Audit
         run: |
           python -m venv /tmp/audit
+          /tmp/audit/bin/python -m pip install --upgrade pip
           /tmp/audit/bin/pip install . pip-audit
           /tmp/audit/bin/pip-audit --skip-editable

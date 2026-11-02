@@ -51,7 +51,7 @@ tokens, the wallet or the gateway (see its README).
 The documentation site lives in `docs-site/` (Docus). Build it in Docker:
 
 ```bash
-docker build -t auth-ai-python-docs ./docs-site
+docker build -t auth-ai-py-docs ./docs-site
 ```
 
 ---
@@ -108,7 +108,7 @@ manual action on pypi.org.
 
 Both workflows publish through PyPI Trusted Publishing (OIDC): no PyPI token is stored.
 Each one must be registered as a trusted publisher of the `auth-ai` project on pypi.org
-(owner `circle-rd`, repository `auth-ai-python`, workflow `release.yml` or `nightly.yml`,
+(owner `circle-rd`, repository `auth-ai-py`, workflow `release.yml` or `nightly.yml`,
 environment `pypi`). Before the first upload, register them as _pending publishers_.
 
 ---
