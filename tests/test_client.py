@@ -6,7 +6,7 @@ from collections.abc import AsyncIterator
 from typing import Any
 from urllib.parse import parse_qs, quote, unquote, urlsplit
 
-import httpx
+import httpx2
 import pytest
 
 from auth_ai import AuthAiError, AuthClient, AuthClientConfig, LoginHandshake
@@ -63,7 +63,7 @@ def respond_with_tokens(idp: MockIdp, handshake: LoginHandshake, **claims: Any) 
     )
 
 
-def bearer_token_response(**extra: Any) -> httpx.Response:
+def bearer_token_response(**extra: Any) -> httpx2.Response:
     return json_response({"access_token": "a", "token_type": "Bearer", "expires_in": 60, **extra})
 
 
@@ -398,8 +398,8 @@ class TestRefresh:
         assert (err.details or {})["oauthError"] == "invalid_grant"
 
     async def test_wraps_a_transport_failure(self, auth: AuthClient, idp: MockIdp) -> None:
-        def fail(_request: Any) -> httpx.Response:
-            raise httpx.ConnectError("unreachable")
+        def fail(_request: Any) -> httpx2.Response:
+            raise httpx2.ConnectError("unreachable")
 
         idp.token_handler = fail
         await expect_error(auth.refresh("refresh-1"), "OIDC_003")
@@ -407,7 +407,7 @@ class TestRefresh:
     async def test_answers_a_non_json_error_with_its_status_only(
         self, auth: AuthClient, idp: MockIdp
     ) -> None:
-        idp.token_handler = lambda _request: httpx.Response(502, text="bad gateway")
+        idp.token_handler = lambda _request: httpx2.Response(502, text="bad gateway")
         err = await expect_error(auth.refresh("refresh-1"), "OIDC_003")
         assert err.details == {"status": 502}
 
@@ -544,7 +544,7 @@ class TestClientCredentials:
     async def test_explains_a_client_authentication_challenge(
         self, auth: AuthClient, idp: MockIdp
     ) -> None:
-        idp.token_handler = lambda _request: httpx.Response(
+        idp.token_handler = lambda _request: httpx2.Response(
             401, headers={"www-authenticate": 'Basic realm="token"'}
         )
         err = await expect_error(auth.client_credentials(), "OIDC_003")

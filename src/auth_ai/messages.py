@@ -4,7 +4,7 @@ import json
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Final
 
-import httpx
+import httpx2
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping, Sequence
@@ -22,7 +22,7 @@ class WebRequest:
 
     method: str
     url: str
-    headers: httpx.Headers = field(default_factory=httpx.Headers)
+    headers: httpx2.Headers = field(default_factory=httpx2.Headers)
     body: bytes = b""
 
     @classmethod
@@ -34,7 +34,7 @@ class WebRequest:
         headers: Mapping[str, str] | Sequence[tuple[str, str]] | None = None,
         body: bytes = b"",
     ) -> WebRequest:
-        return cls(method.upper(), url, httpx.Headers(headers), body)
+        return cls(method.upper(), url, httpx2.Headers(headers), body)
 
     def header(self, name: str) -> str | None:
         value: str | None = self.headers.get(name)

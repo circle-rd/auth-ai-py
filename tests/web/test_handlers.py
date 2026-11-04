@@ -5,7 +5,7 @@ import time
 from collections.abc import AsyncIterator, Callable, Sequence
 from urllib.parse import parse_qs, quote, urlsplit
 
-import httpx
+import httpx2
 import pytest
 from joserfc import jwe
 
@@ -55,7 +55,7 @@ def reported_codes(bff: BffHarness) -> list[str]:
     return [err.code for err in bff.errors if isinstance(err, AuthAiError)]
 
 
-def rejection(body: dict[str, str]) -> Callable[[RecordedRequest], httpx.Response]:
+def rejection(body: dict[str, str]) -> Callable[[RecordedRequest], httpx2.Response]:
     return lambda _request: json_response(body, 401)
 
 
@@ -524,17 +524,39 @@ class TestLogout:
         assert response.header_values("set-cookie") == []
         assert await bff.sessions.count_by_user("user-1") == 1
 
-    async def test_is_idempotent_without_a_session(self, bff: BffHarness) -> None:
+    async def test_is_idempotent_without_a_session_and_still_ends_the_provider_session(
+        self, bff: BffHarness
+    ) -> None:
         response = await bff.handle(self.logout(None, origin=ORIGIN, accept="application/json"))
-        assert response.status == 200
-        assert response.json() == {"logoutUrl": None}
-        assert bff.ended == []
 
-    async def test_redirects_to_the_default_page_without_a_session(self, bff: BffHarness) -> None:
-        bff.build(default_redirect="/bye")
+        assert response.status == 200
+        logout_url = response.json()["logoutUrl"]
+        parts = urlsplit(logout_url)
+        assert f"{parts.scheme}://{parts.netloc}{parts.path}" == f"{ISSUER}/end-session"
+        assert "id_token_hint" not in query_of(logout_url)
+        assert query_of(logout_url)["post_logout_redirect_uri"] == [f"{ORIGIN}/"]
+        assert bff.ended == []
+        assert reported_codes(bff) == []
+
+    async def test_redirects_to_the_provider_logout_without_a_session(
+        self, bff: BffHarness
+    ) -> None:
         response = await bff.handle(self.logout(None, origin=ORIGIN))
+
+        assert response.status == 303
+        assert (response.header("location") or "").startswith(f"{ISSUER}/end-session")
+
+    async def test_falls_back_to_the_default_page_without_a_session_and_no_end_session(
+        self, bff: BffHarness
+    ) -> None:
+        del bff.idp.metadata["end_session_endpoint"]
+        bff.build(default_redirect="/bye")
+
+        response = await bff.handle(self.logout(None, origin=ORIGIN))
+
         assert response.status == 303
         assert response.header("location") == "/bye"
+        assert reported_codes(bff) == ["OIDC_004"]
 
     async def test_still_ends_the_local_session_when_the_provider_has_no_end_session_endpoint(
         self, bff: BffHarness
@@ -710,7 +732,7 @@ class TestRoutingAndConfiguration:
 
 class TestFrontendDataRoutes:
     @staticmethod
-    def stats(request: RecordedRequest) -> httpx.Response:
+    def stats(request: RecordedRequest) -> httpx2.Response:
         return json_response(
             {
                 "days": int(request.url.params.get("days", 30)),

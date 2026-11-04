@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import httpx
+import httpx2
 
 from .errors import ERR, AuthAiError
 
@@ -36,7 +36,7 @@ def to_gateway_error(
     if kind:
         details["type"] = kind
 
-    if status == httpx.codes.TOO_MANY_REQUESTS and headers is not None:
+    if status == httpx2.codes.TOO_MANY_REQUESTS and headers is not None:
         try:
             retry_after = float(headers.get("retry-after", ""))
         except ValueError:
@@ -45,13 +45,13 @@ def to_gateway_error(
             details["retryAfterSeconds"] = retry_after
 
     match status:
-        case httpx.codes.PAYMENT_REQUIRED:
+        case httpx2.codes.PAYMENT_REQUIRED:
             return ERR.GW_001(message, details=details)
-        case httpx.codes.TOO_MANY_REQUESTS:
+        case httpx2.codes.TOO_MANY_REQUESTS:
             return ERR.GW_002(message, details=details)
-        case httpx.codes.UNAUTHORIZED | httpx.codes.FORBIDDEN:
+        case httpx2.codes.UNAUTHORIZED | httpx2.codes.FORBIDDEN:
             return ERR.GW_003(message, details=details)
-        case httpx.codes.SERVICE_UNAVAILABLE:
+        case httpx2.codes.SERVICE_UNAVAILABLE:
             return ERR.GW_004(message, details=details)
         case _:
             return ERR.GW_005(message or f"The gateway answered {status}", details=details)
@@ -68,7 +68,7 @@ def is_insufficient_credit_status(err: object) -> bool:
 
     The gateway answers 402 when the balance is zero or negative.
     """
-    return httpx.codes.PAYMENT_REQUIRED in {
+    return httpx2.codes.PAYMENT_REQUIRED in {
         getattr(err, "status_code", None),
         getattr(err, "status", None),
     }

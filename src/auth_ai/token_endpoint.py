@@ -5,7 +5,7 @@ import time
 from typing import TYPE_CHECKING, Any
 from urllib.parse import quote_plus
 
-import httpx
+import httpx2
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 from .errors import ERR, AuthAiError
@@ -55,11 +55,11 @@ class ProviderEndpoints:
     between concurrent users.
     """
 
-    def __init__(self, config: AuthClientConfig, http: httpx.AsyncClient) -> None:
+    def __init__(self, config: AuthClientConfig, http: httpx2.AsyncClient) -> None:
         self._config = config
         self._http = http
 
-    async def post(self, url: str, form: Mapping[str, FormValue]) -> httpx.Response:
+    async def post(self, url: str, form: Mapping[str, FormValue]) -> httpx2.Response:
         """POSTs `form` with the client's credentials. Transport errors become OIDC_003."""
         data: dict[str, FormValue] = dict(form)
         headers = {"accept": "application/json"}
@@ -81,7 +81,7 @@ class ProviderEndpoints:
                 timeout=config.timeout_seconds,
                 follow_redirects=False,
             )
-        except httpx.HTTPError as err:
+        except httpx2.HTTPError as err:
             raise ERR.OIDC_003(cause=err) from err
 
     async def token_request(self, url: str, form: Mapping[str, FormValue]) -> TokenSet:
@@ -95,7 +95,7 @@ class ProviderEndpoints:
             raise ERR.OIDC_003("The token response has an unexpected shape", cause=err) from err
 
 
-def _json_object(response: httpx.Response) -> dict[str, Any] | None:
+def _json_object(response: httpx2.Response) -> dict[str, Any] | None:
     try:
         body = response.json()
     except ValueError:
@@ -103,7 +103,7 @@ def _json_object(response: httpx.Response) -> dict[str, Any] | None:
     return body if isinstance(body, dict) else None
 
 
-def _rejection(response: httpx.Response, body: dict[str, Any] | None) -> AuthAiError:
+def _rejection(response: httpx2.Response, body: dict[str, Any] | None) -> AuthAiError:
     """Maps a refusal to OIDC_003, keeping only the RFC 6749 error fields (no credential)."""
     status = response.status_code
     error = body.get("error") if body else None

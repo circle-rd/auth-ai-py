@@ -47,7 +47,7 @@ async def models(session: Session = Depends(require_auth(handlers))):
 
 - **Do not reinvent OAuth or JOSE.** Signature, JWT and cookie encryption work stays
   with the maintained library [joserfc](https://jose.authlib.org) and HTTP with
-  [httpx](https://www.python-httpx.org); the SDK adds what is specific to auth-service
+  [httpx2](https://pypi.org/project/httpx2/); the SDK adds what is specific to auth-service
   on top of them. The declared direct runtime dependencies are licensed under BSD-3-Clause or MIT.
 - **Backend-for-frontend by default.** The browser holds one opaque session
   cookie. Access and refresh tokens never reach it.
@@ -57,8 +57,8 @@ async def models(session: Session = Depends(require_auth(handlers))):
 - **Strict at every boundary.** Every external payload (tokens, API answers,
   cookies, configuration) is validated with [pydantic](https://docs.pydantic.dev);
   the package ships `py.typed` and is checked with `mypy --strict`.
-- **Async all the way.** Built on [httpx](https://www.python-httpx.org) and
-  `asyncio`; bring your own `httpx.AsyncClient` for proxies, transports or tracing.
+- **Async all the way.** Built on [httpx2](https://pypi.org/project/httpx2/) and
+  `asyncio`; bring your own `httpx2.AsyncClient` for proxies, transports or tracing.
 - **Centralized spending.** The SDK never debits a wallet itself: the gateway
   bills each call, so margin and pricing stay under the administrator's control.
 
@@ -89,7 +89,7 @@ async def models(session: Session = Depends(require_auth(handlers))):
 
 - One switch in auth-service ("LiteLLM support") and one option here
   (`gateway_url`) turn on the gateway and wallet audiences.
-- An origin-locked `httpx` client that signs OpenAI-compatible calls with a
+- An origin-locked `httpx2` client that signs OpenAI-compatible calls with a
   fresh user token (hand it to the `openai` package); model, agent and MCP
   server listing; gateway errors mapped (`402` → `GW_001`, `429` with
   `Retry-After`, …).
@@ -171,7 +171,7 @@ async def models(session: Session = Depends(require_auth(handlers))):
 ```
 
 Calling the gateway with the `openai` package (or any OpenAI-compatible SDK that
-takes an `httpx` client):
+takes an `httpx2` client):
 
 ```python
 from openai import AsyncOpenAI
@@ -240,7 +240,7 @@ auth-ai-py/
 │   ├── grants.py          GrantManager — serialized refresh rotation, per-audience tokens
 │   ├── claims.py          Claim models and entitlement helpers
 │   ├── wallet.py          WalletClient and wallet models (int micro-euros)
-│   ├── gateway.py         GatewayClient — origin-locked httpx client, listings, MCP URLs
+│   ├── gateway.py         GatewayClient — origin-locked httpx2 client, listings, MCP URLs
 │   ├── ai.py              AiClient.for_user(grant_id)
 │   ├── errors.py          AuthAiError + ERR registry (OIDC_*, TOK_*, GW_*, SES_*…)
 │   ├── 📁 server/         Bearer verification, back-channel logout, machine API
@@ -302,7 +302,7 @@ Security reports: see [SECURITY.md](SECURITY.md). Releases are tracked in
 
 Built and maintained by [CIRCLE](https://circle-cyber.com). Stands on the
 shoulders of [joserfc](https://jose.authlib.org),
-[httpx](https://www.python-httpx.org), [pydantic](https://docs.pydantic.dev) and
+[httpx2](https://pypi.org/project/httpx2/), [pydantic](https://docs.pydantic.dev) and
 [Starlette](https://www.starlette.io).
 
 Licensed under the **MIT License** — see [LICENSE](LICENSE).

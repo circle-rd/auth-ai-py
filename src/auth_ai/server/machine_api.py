@@ -9,7 +9,7 @@ from .consumption import ConsumptionApi
 from .machine_tokens import ClientCredentialsAuth, MachineTokenProvider
 
 if TYPE_CHECKING:
-    import httpx
+    import httpx2
 
     from ..config import AuthClientConfig
 
@@ -19,7 +19,7 @@ class MachineAuth(ClientCredentialsAuth, Protocol):
     def config(self) -> AuthClientConfig: ...
 
     @property
-    def http(self) -> httpx.AsyncClient: ...
+    def http(self) -> httpx2.AsyncClient: ...
 
 
 class MachineApi:

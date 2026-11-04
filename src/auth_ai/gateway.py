@@ -3,11 +3,12 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING, Final, Protocol
 
-import httpx
+import httpx2
 from pydantic import BaseModel, ConfigDict, TypeAdapter, ValidationError
 
 from .errors import ERR
 from .gateway_errors import to_gateway_error
+from .transport import build_http_client
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Mapping
@@ -54,7 +55,7 @@ class GatewayTokens(Protocol):
         ...
 
 
-class GatewayAuth(httpx.Auth):
+class GatewayAuth(httpx2.Auth):
     """Signs requests to the gateway with a fresh user token.
 
     Give it to an OpenAI-compatible SDK through `GatewayClient.create_http_client()`.
@@ -63,12 +64,12 @@ class GatewayAuth(httpx.Auth):
     """
 
     def __init__(self, gateway_url: str, tokens: GatewayTokens) -> None:
-        self._origin = httpx.URL(gateway_url).copy_with(path="/", query=None, fragment=None)
+        self._origin = httpx2.URL(gateway_url).copy_with(path="/", query=None, fragment=None)
         self._tokens = tokens
 
     async def async_auth_flow(
-        self, request: httpx.Request
-    ) -> AsyncGenerator[httpx.Request, httpx.Response]:
+        self, request: httpx2.Request
+    ) -> AsyncGenerator[httpx2.Request, httpx2.Response]:
         url = request.url
         if (url.scheme, url.host, url.port) != (
             self._origin.scheme,
@@ -78,7 +79,7 @@ class GatewayAuth(httpx.Auth):
             raise ERR.CFG_001("This client only serves requests to the gateway")
         request.headers["authorization"] = f"Bearer {await self._tokens.get_token()}"
         response = yield request
-        if response.status_code == httpx.codes.UNAUTHORIZED:
+        if response.status_code == httpx2.codes.UNAUTHORIZED:
             self._tokens.invalidate()
 
 
@@ -95,7 +96,7 @@ class GatewayClient:
         *,
         gateway_url: str,
         tokens: GatewayTokens,
-        http: httpx.AsyncClient,
+        http: httpx2.AsyncClient,
         timeout_seconds: float,
     ) -> None:
         self._gateway_url = gateway_url
@@ -113,23 +114,22 @@ class GatewayClient:
         self,
         *,
         timeout: float | None = None,
-        transport: httpx.AsyncBaseTransport | None = None,
-    ) -> httpx.AsyncClient:
-        """An `httpx.AsyncClient` signing every request with a fresh user token.
+        transport: httpx2.AsyncBaseTransport | None = None,
+    ) -> httpx2.AsyncClient:
+        """An `httpx2.AsyncClient` signing every request with a fresh user token.
 
         Pass it to an OpenAI-compatible SDK together with
         `base_url=openai_base_url` and any placeholder `api_key`. The caller owns
         the client and closes it.
         """
-        return httpx.AsyncClient(
-            auth=self.auth,
-            timeout=self._timeout if timeout is None else timeout,
+        return build_http_client(
+            timeout_seconds=self._timeout if timeout is None else timeout,
             transport=transport,
-            follow_redirects=False,
+            auth=self.auth,
         )
 
     async def get_access_token(self) -> str:
-        """A fresh access token, for clients that cannot take an `httpx` client."""
+        """A fresh access token, for clients that cannot take an `httpx2` client."""
         return await self._tokens.get_token()
 
     async def list_models(self) -> list[GatewayModel]:
@@ -184,7 +184,7 @@ class GatewayClient:
                 timeout=self._timeout,
                 follow_redirects=False,
             )
-        except httpx.HTTPError as err:
+        except httpx2.HTTPError as err:
             raise ERR.GW_004("The gateway is unreachable", cause=err) from err
         try:
             body: object = response.json()

@@ -8,7 +8,7 @@ from .http import JsonHttp
 from .wallet import WalletClient
 
 if TYPE_CHECKING:
-    import httpx
+    import httpx2
 
     from .config import AuthClientConfig
     from .grants import AccessToken
@@ -19,7 +19,7 @@ class AiAuth(Protocol):
     def config(self) -> AuthClientConfig: ...
 
     @property
-    def http(self) -> httpx.AsyncClient: ...
+    def http(self) -> httpx2.AsyncClient: ...
 
 
 class AiGrants(Protocol):

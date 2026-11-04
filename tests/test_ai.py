@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import AsyncIterator, Callable
 
-import httpx
+import httpx2
 import pytest
 
 from auth_ai import AccessToken, AiClient, AuthAiError, AuthClient, GrantManager, MemoryGrantStore
@@ -31,7 +31,7 @@ class Harness:
         self.ai: AiClient
         self.build(GATEWAY_URL)
 
-    def _issue(self, request: RecordedRequest) -> httpx.Response:
+    def _issue(self, request: RecordedRequest) -> httpx2.Response:
         resource = request.form.get("resource", "none")
         self.resources.append(resource)
         return json_response(
@@ -104,7 +104,7 @@ class TestForUser:
         await harness.grants.save("u1", "refresh-0")
         status = 200
         idp.gateway_handler = lambda _request: (
-            json_response({"data": []}) if status == 200 else httpx.Response(status)
+            json_response({"data": []}) if status == 200 else httpx2.Response(status)
         )
         gateway = harness.ai.for_user("u1").gateway
 
@@ -227,7 +227,7 @@ class TestWithAnyGrantSource:
         self, idp: MockIdp, build: Callable[[FakeGrants], AiClient]
     ) -> None:
         grants = FakeGrants()
-        idp.gateway_handler = lambda _request: httpx.Response(401)
+        idp.gateway_handler = lambda _request: httpx2.Response(401)
         user = build(grants).for_user("u1")
 
         with pytest.raises(AuthAiError):

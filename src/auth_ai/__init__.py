@@ -45,6 +45,7 @@ from .grants import (
 )
 from .introspection import IntrospectionResult
 from .session_user import SessionUser, to_session_user
+from .transport import build_http_client
 from .types import (
     LoginHandshake,
     LoginRequest,
@@ -114,6 +115,7 @@ __all__ = [
     "WalletTransactionPage",
     "WalletTransactionType",
     "__version__",
+    "build_http_client",
     "format_euros",
     "get_feature",
     "has_feature",

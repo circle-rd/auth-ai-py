@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from typing import Annotated
 from urllib.parse import parse_qs, quote, urlencode, urlsplit
 
-import httpx
+import httpx2
 import pytest
 from fastapi import Depends, FastAPI
 from pydantic import BaseModel
@@ -130,19 +130,19 @@ async def bff(idp: MockIdp) -> AsyncIterator[BffHarness]:
 
 
 @asynccontextmanager
-async def serve(app: Starlette) -> AsyncIterator[httpx.AsyncClient]:
-    transport = httpx.ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url=ORIGIN) as client:
+async def serve(app: Starlette) -> AsyncIterator[httpx2.AsyncClient]:
+    transport = httpx2.ASGITransport(app=app)
+    async with httpx2.AsyncClient(transport=transport, base_url=ORIGIN) as client:
         yield client
 
 
 @pytest.fixture
-async def client(bff: BffHarness, make_app: AppFactory) -> AsyncIterator[httpx.AsyncClient]:
+async def client(bff: BffHarness, make_app: AppFactory) -> AsyncIterator[httpx2.AsyncClient]:
     async with serve(make_app(bff.handlers)) as served:
         yield served
 
 
-def cookies_of(response: httpx.Response) -> dict[str, str]:
+def cookies_of(response: httpx2.Response) -> dict[str, str]:
     cookies: dict[str, str] = {}
     for line in response.headers.get_list("set-cookie"):
         name, _, value = line.split(";", 1)[0].partition("=")
@@ -150,7 +150,7 @@ def cookies_of(response: httpx.Response) -> dict[str, str]:
     return cookies
 
 
-async def sign_in(client: httpx.AsyncClient, bff: BffHarness) -> str:
+async def sign_in(client: httpx2.AsyncClient, bff: BffHarness) -> str:
     login = await client.get("/auth/login?next=/home")
     assert login.status_code == 302
     authorize = parse_qs(urlsplit(login.headers["location"]).query)
@@ -172,7 +172,7 @@ def as_user(cookie: str) -> dict[str, str]:
 
 class TestRoutes:
     async def test_serves_login_with_its_cookie_and_redirect(
-        self, client: httpx.AsyncClient
+        self, client: httpx2.AsyncClient
     ) -> None:
         response = await client.get("/auth/login")
         assert response.status_code == 302
@@ -181,7 +181,7 @@ class TestRoutes:
         assert response.headers.get_list("set-cookie")[0].startswith(f"{LOGIN_COOKIE}=")
 
     async def test_completes_a_sign_in_and_serves_me(
-        self, client: httpx.AsyncClient, bff: BffHarness
+        self, client: httpx2.AsyncClient, bff: BffHarness
     ) -> None:
         cookie = await sign_in(client, bff)
         me = await client.get("/auth/me", headers=as_user(cookie))
@@ -190,7 +190,7 @@ class TestRoutes:
         assert me.json()["user"]["roles"] == ["editor"]
 
     async def test_keeps_every_set_cookie_header_of_the_callback(
-        self, client: httpx.AsyncClient, bff: BffHarness
+        self, client: httpx2.AsyncClient, bff: BffHarness
     ) -> None:
         login = await client.get("/auth/login")
         authorize = parse_qs(urlsplit(login.headers["location"]).query)
@@ -205,7 +205,7 @@ class TestRoutes:
         assert cookies[1].startswith(f"{SESSION_COOKIE}=")
 
     async def test_logs_out_and_clears_the_cookie(
-        self, client: httpx.AsyncClient, bff: BffHarness
+        self, client: httpx2.AsyncClient, bff: BffHarness
     ) -> None:
         cookie = await sign_in(client, bff)
 
@@ -220,7 +220,7 @@ class TestRoutes:
         assert (await client.get("/auth/me", headers=as_user(cookie))).status_code == 401
 
     async def test_refuses_a_cross_site_logout(
-        self, client: httpx.AsyncClient, bff: BffHarness
+        self, client: httpx2.AsyncClient, bff: BffHarness
     ) -> None:
         cookie = await sign_in(client, bff)
         response = await client.post(
@@ -230,7 +230,7 @@ class TestRoutes:
         assert (await client.get("/auth/me", headers=as_user(cookie))).status_code == 200
 
     async def test_reads_the_back_channel_logout_form(
-        self, client: httpx.AsyncClient, bff: BffHarness
+        self, client: httpx2.AsyncClient, bff: BffHarness
     ) -> None:
         cookie = await sign_in(client, bff)
 
@@ -245,7 +245,7 @@ class TestRoutes:
         assert (await client.get("/auth/me", headers=as_user(cookie))).status_code == 401
 
     async def test_caps_the_back_channel_logout_body(
-        self, client: httpx.AsyncClient, bff: BffHarness
+        self, client: httpx2.AsyncClient, bff: BffHarness
     ) -> None:
         cookie = await sign_in(client, bff)
         oversized = urlencode({"logout_token": bff.logout_token(), "padding": "a" * MAX_BODY_BYTES})
@@ -257,7 +257,7 @@ class TestRoutes:
         assert (await client.get("/auth/me", headers=as_user(cookie))).status_code == 200
 
     async def test_caps_a_back_channel_logout_body_sent_without_a_length(
-        self, client: httpx.AsyncClient, bff: BffHarness
+        self, client: httpx2.AsyncClient, bff: BffHarness
     ) -> None:
         async def chunks() -> AsyncIterator[bytes]:
             yield f"logout_token={bff.logout_token()}&padding=".encode()
@@ -270,7 +270,7 @@ class TestRoutes:
         assert response.json() == {"error": "invalid_request"}
 
     async def test_answers_405_and_404_through_the_handlers(
-        self, client: httpx.AsyncClient
+        self, client: httpx2.AsyncClient
     ) -> None:
         wrong_method = await client.post("/auth/login")
         assert wrong_method.status_code == 405
@@ -282,7 +282,7 @@ class TestRoutes:
         assert (await client.get("/public")).json() == {"ok": True}
 
     async def test_builds_urls_on_the_registered_origin_not_on_the_host_header(
-        self, client: httpx.AsyncClient, bff: BffHarness
+        self, client: httpx2.AsyncClient, bff: BffHarness
     ) -> None:
         assert (await client.get("/host", headers={"host": "evil.test"})).json() == {
             "host": "evil.test"
@@ -295,7 +295,7 @@ class TestRoutes:
         assert all("evil.test" not in str(r.url) for r in bff.idp.requests)
 
     async def test_does_not_trust_the_host_header_of_the_callback(
-        self, client: httpx.AsyncClient, bff: BffHarness
+        self, client: httpx2.AsyncClient, bff: BffHarness
     ) -> None:
         login = await client.get("/auth/login")
         authorize = parse_qs(urlsplit(login.headers["location"]).query)
@@ -313,39 +313,39 @@ class TestRoutes:
         token_request = bff.idp.requests_to("/token")[0]
         assert token_request.form.get("redirect_uri") == f"{ORIGIN}/auth/callback"
 
-    async def test_ignores_a_path_that_is_not_a_route(self, client: httpx.AsyncClient) -> None:
+    async def test_ignores_a_path_that_is_not_a_route(self, client: httpx2.AsyncClient) -> None:
         assert (await client.get("/auth/login//")).status_code == 404
 
 
 class TestDependencies:
     async def test_require_auth_answers_401_to_a_signed_out_request(
-        self, client: httpx.AsyncClient
+        self, client: httpx2.AsyncClient
     ) -> None:
         response = await client.get("/private")
         assert response.status_code == 401
         assert response.json() == {"error": {"code": "SES_001", "message": "Not signed in"}}
 
     async def test_require_auth_answers_401_to_a_forged_cookie(
-        self, client: httpx.AsyncClient
+        self, client: httpx2.AsyncClient
     ) -> None:
         assert (await client.get("/private", headers=as_user("forged"))).status_code == 401
 
     async def test_require_auth_exposes_the_session_to_the_route(
-        self, client: httpx.AsyncClient, bff: BffHarness
+        self, client: httpx2.AsyncClient, bff: BffHarness
     ) -> None:
         cookie = await sign_in(client, bff)
         response = await client.get("/private", headers=as_user(cookie))
         assert response.json() == {"sub": "user-1", "roles": ["editor"]}
 
     async def test_load_session_never_blocks(
-        self, client: httpx.AsyncClient, bff: BffHarness
+        self, client: httpx2.AsyncClient, bff: BffHarness
     ) -> None:
         assert (await client.get("/maybe")).json() == {"signedIn": False}
         cookie = await sign_in(client, bff)
         assert (await client.get("/maybe", headers=as_user(cookie))).json() == {"signedIn": True}
 
     async def test_require_auth_leaves_the_body_to_the_route(
-        self, client: httpx.AsyncClient, bff: BffHarness
+        self, client: httpx2.AsyncClient, bff: BffHarness
     ) -> None:
         cookie = await sign_in(client, bff)
         response = await client.post("/echo", headers=as_user(cookie), json={"message": "hello"})
@@ -353,14 +353,14 @@ class TestDependencies:
         assert response.json() == {"echo": {"message": "hello"}}
 
     async def test_a_signed_out_post_is_refused_before_its_body_matters(
-        self, client: httpx.AsyncClient
+        self, client: httpx2.AsyncClient
     ) -> None:
         response = await client.post("/echo", json={"message": "hello"})
         assert response.status_code == 401
         assert response.json()["error"]["code"] == "SES_001"
 
     async def test_answers_a_route_error_with_the_public_envelope_only(
-        self, client: httpx.AsyncClient
+        self, client: httpx2.AsyncClient
     ) -> None:
         response = await client.get("/forbidden")
         assert response.status_code == 403

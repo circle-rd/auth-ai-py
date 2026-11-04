@@ -7,7 +7,6 @@ import secrets
 from typing import TYPE_CHECKING, Any, Self
 from urllib.parse import parse_qs, urlencode, urlsplit, urlunsplit
 
-import httpx
 from pydantic import ValidationError
 
 from .claims import IdTokenClaims
@@ -17,6 +16,7 @@ from .id_token import check_id_token_binding
 from .introspection import IntrospectionResult
 from .provider import Provider, ProviderLoader
 from .token_endpoint import ProviderEndpoints
+from .transport import build_http_client
 from .types import (
     LoginHandshake,
     LoginRequest,
@@ -29,6 +29,8 @@ from .types import (
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
     from types import TracebackType
+
+    import httpx2
 
 _PKCE_VERIFIER_BYTES = 48
 _RANDOM_BYTES = 32
@@ -46,7 +48,7 @@ class AuthClient:
     logout, revocation and introspection. It keeps no session: callers persist the
     handshake, the tokens and the claims where it suits them.
 
-    `http_client` replaces the default `httpx.AsyncClient`, e.g. to add a proxy, a
+    `http_client` replaces the default `httpx2.AsyncClient`, e.g. to add a proxy, a
     transport or an observability layer. A client given by the caller is never
     closed by the SDK; otherwise call `aclose()` (or use `async with`).
     """
@@ -55,7 +57,7 @@ class AuthClient:
         self,
         config: AuthClientConfig | Mapping[str, Any],
         *,
-        http_client: httpx.AsyncClient | None = None,
+        http_client: httpx2.AsyncClient | None = None,
     ) -> None:
         self.config = (
             config
@@ -64,9 +66,7 @@ class AuthClient:
         )
         self._owns_http = http_client is None
         #: The client used for every request, shared with the REST API clients built on this one.
-        self.http = http_client or httpx.AsyncClient(
-            timeout=self.config.timeout_seconds, follow_redirects=False
-        )
+        self.http = http_client or build_http_client(timeout_seconds=self.config.timeout_seconds)
         self._provider = ProviderLoader(self.config, self.http)
         self._endpoints = ProviderEndpoints(self.config, self.http)
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 
-import httpx
+import httpx2
 import pytest
 
 from auth_ai import MICRO_PER_EUR, AuthAiError, WalletClient, format_euros
@@ -145,7 +145,7 @@ class TestAccount:
     async def test_rejects_a_body_that_is_not_json(
         self, idp: MockIdp, wallet: WalletClient
     ) -> None:
-        idp.api_handler = lambda _request: httpx.Response(200, text="<html>")
+        idp.api_handler = lambda _request: httpx2.Response(200, text="<html>")
 
         with pytest.raises(AuthAiError) as caught:
             await wallet.get_account()
@@ -168,7 +168,7 @@ class TestAccount:
     async def test_reports_a_failure_without_an_error_body_by_status(
         self, idp: MockIdp, wallet: WalletClient
     ) -> None:
-        idp.api_handler = lambda _request: httpx.Response(502, text="bad gateway")
+        idp.api_handler = lambda _request: httpx2.Response(502, text="bad gateway")
 
         with pytest.raises(AuthAiError) as caught:
             await wallet.get_account()

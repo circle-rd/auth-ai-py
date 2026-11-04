@@ -14,6 +14,30 @@ Sections, when present, appear in this order: `Added`, `Changed`, `Removed`,
 
 <!-- Add user-visible changes here. Move to a dated section at release time. -->
 
+### Added
+
+- **`build_http_client(*, timeout_seconds, transport=None, auth=None)`**: the HTTP client every
+  SDK call uses. HTTP/2 is negotiated over TLS with HTTP/1.1 as the fallback, gzip and brotli
+  responses are decoded (zstd where the runtime provides it, Python 3.14), and redirects are
+  never followed. Exported from `auth_ai`.
+
+### Changed
+
+- The HTTP stack moved from `httpx` to `httpx2` (BSD-3-Clause), the transport of the `openai`
+  3.x package that the gateway integration relies on. `httpx2[brotli,http2]` is a runtime
+  dependency; `GatewayClient.create_http_client()` returns an `httpx2.AsyncClient`, which matches
+  the `openai` 3.x annotation and needs no type ignore.
+- `POST /logout` answers the provider's logout URL even without a local session, built without
+  `id_token_hint`: the provider ends its single sign-on session for every application and asks
+  the user to confirm. `logoutUrl` is `null` only when the provider advertises no end-session
+  endpoint.
+
+### Removed
+
+- The `httpx` dependency. `AuthClient(http_client=...)`, `auth.http` and
+  `GatewayClient.create_http_client()` take and return `httpx2` clients: an `httpx.AsyncClient`
+  no longer type-checks as `http_client`. Build the client with `build_http_client()`.
+
 ## [0.1.0] - 2026-11-02
 
 First release: the Python port of `@circle-rd/auth-ai` 0.1.1, with the same behaviours,

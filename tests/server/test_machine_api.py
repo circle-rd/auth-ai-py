@@ -6,7 +6,7 @@ import time
 from dataclasses import dataclass
 from types import SimpleNamespace
 
-import httpx
+import httpx2
 import pytest
 
 from auth_ai import AuthAiError, AuthClient
@@ -36,7 +36,7 @@ AGGREGATE = {"key": "docs", "total": "12", "updatedAt": "2026-10-31T08:00:00.000
 class TokenIssuer:
     issued: int = 0
 
-    def __call__(self, _request: RecordedRequest) -> httpx.Response:
+    def __call__(self, _request: RecordedRequest) -> httpx2.Response:
         self.issued += 1
         return json_response(
             {"access_token": f"machine-{self.issued}", "token_type": "Bearer", "expires_in": 3600}
@@ -124,7 +124,7 @@ class TestMachineTokens:
     async def test_retries_once_with_a_fresh_token_after_a_401(
         self, idp: MockIdp, api: MachineApi, issuer: TokenIssuer
     ) -> None:
-        def handler(request: RecordedRequest) -> httpx.Response:
+        def handler(request: RecordedRequest) -> httpx2.Response:
             if request.headers["authorization"] == "Bearer machine-2":
                 return json_response({"subscription": None})
             return json_response({"error": {"code": "AUTH_001", "message": "expired"}}, 401)
@@ -256,7 +256,7 @@ class TestBilling:
         assert raised.value.code == "API_002"
 
     async def test_flags_a_response_that_is_not_json(self, idp: MockIdp, api: MachineApi) -> None:
-        idp.api_handler = lambda _request: httpx.Response(200, text="<html>")
+        idp.api_handler = lambda _request: httpx2.Response(200, text="<html>")
 
         with pytest.raises(AuthAiError) as raised:
             await api.billing.get_usage("u1")
@@ -266,7 +266,7 @@ class TestBilling:
     async def test_reports_an_error_without_a_documented_body_by_its_status(
         self, idp: MockIdp, api: MachineApi
     ) -> None:
-        idp.api_handler = lambda _request: httpx.Response(502, text="bad gateway")
+        idp.api_handler = lambda _request: httpx2.Response(502, text="bad gateway")
 
         with pytest.raises(AuthAiError) as raised:
             await api.billing.get_usage("u1")

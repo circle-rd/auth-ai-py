@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import NotRequired, TypedDict, Unpack
 from urllib.parse import parse_qs, quote, urlencode, urlsplit
 
-import httpx
+import httpx2
 
 from auth_ai import AiClient, AuthClient, GrantManager, MemoryGrantStore
 from auth_ai.messages import WebRequest, WebResponse
@@ -114,7 +114,7 @@ class BffHarness:
         parts = self.create()
         self.auth, self.grants, self.handlers = parts.auth, parts.grants, parts.handlers
 
-    def _token(self, request: RecordedRequest) -> httpx.Response:
+    def _token(self, request: RecordedRequest) -> httpx2.Response:
         base = {"token_type": "Bearer", "expires_in": 3600, "scope": "openid roles"}
         if request.form.get("grant_type") == "refresh_token":
             self.refreshes += 1
