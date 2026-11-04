@@ -405,12 +405,15 @@ class AuthHandlers:
             return error_response(ERR.SES_004(), self.on_error)
         session = await self._read_session(request)
         logout_url: str | None = None
+        try:
+            # The SSO session is shared by every application: end it even without a local session.
+            logout_url = await self._auth.logout_url(
+                id_token_hint=session.id_token if session is not None else None
+            )
+        except Exception as err:  # noqa: BLE001
+            # A provider without end-session still lets the local session end.
+            self._report(err)
         if session is not None:
-            try:
-                logout_url = await self._auth.logout_url(id_token_hint=session.id_token)
-            except Exception as err:  # noqa: BLE001
-                # A provider without end-session still lets the local session end.
-                self._report(err)
             await self._end_sessions([session])
 
         headers = self._with_cookies(clear_cookie(self._session_cookie, secure=self._secure))

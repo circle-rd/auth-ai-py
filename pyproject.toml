@@ -61,7 +61,7 @@ classifiers = [
   "Typing :: Typed",
 ]
 dependencies = [
-  "httpx>=0.28",
+  "httpx2[brotli,http2]>=2.16",
   "joserfc>=1.7",
   "pydantic>=2.12",
 ]
@@ -156,6 +156,10 @@ warn_unreachable = true
 enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
 files = ["src", "tests", "examples/minimal/app"]
 plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["brotli"]
+ignore_missing_imports = true
 
 [tool.pydantic-mypy]
 init_forbid_extra = true

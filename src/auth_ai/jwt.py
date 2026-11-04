@@ -5,7 +5,7 @@ import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Final
 
-import httpx
+import httpx2
 from joserfc import jwt
 from joserfc.errors import JoseError
 from joserfc.jwk import KeySet
@@ -33,7 +33,7 @@ class RemoteJwks:
     def __init__(
         self,
         uri: str,
-        http: httpx.AsyncClient,
+        http: httpx2.AsyncClient,
         timeout_seconds: float,
     ) -> None:
         self._uri = uri
@@ -75,7 +75,7 @@ class RemoteJwks:
             )
             response.raise_for_status()
             keys = KeySet.import_key_set(response.json())
-        except (httpx.HTTPError, ValueError, JoseError) as err:
+        except (httpx2.HTTPError, ValueError, JoseError) as err:
             raise ERR.TOK_001("Fetching the provider's keys failed", cause=err) from err
         self._keys = keys
         self._loaded_at = time.monotonic()

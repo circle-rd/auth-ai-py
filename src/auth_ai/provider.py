@@ -5,7 +5,7 @@ import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Final
 
-import httpx
+import httpx2
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 from .errors import ERR
@@ -56,7 +56,7 @@ class Provider:
     jwt: JwtVerifier
 
 
-async def _discover(config: AuthClientConfig, http: httpx.AsyncClient) -> Provider:
+async def _discover(config: AuthClientConfig, http: httpx2.AsyncClient) -> Provider:
     url = f"{config.issuer}/.well-known/openid-configuration"
     try:
         response = await http.get(
@@ -67,7 +67,7 @@ async def _discover(config: AuthClientConfig, http: httpx.AsyncClient) -> Provid
         )
         response.raise_for_status()
         metadata = ProviderMetadata.model_validate(response.json())
-    except (httpx.HTTPError, ValueError, ValidationError) as err:
+    except (httpx2.HTTPError, ValueError, ValidationError) as err:
         raise ERR.OIDC_001(cause=err) from err
     if metadata.issuer != config.issuer:
         raise ERR.OIDC_001("The discovery document names another issuer")
@@ -95,7 +95,7 @@ async def _discover(config: AuthClientConfig, http: httpx.AsyncClient) -> Provid
 class ProviderLoader:
     """Discovers the provider once and again after an hour. A failed load is not cached."""
 
-    def __init__(self, config: AuthClientConfig, http: httpx.AsyncClient) -> None:
+    def __init__(self, config: AuthClientConfig, http: httpx2.AsyncClient) -> None:
         self._config = config
         self._http = http
         self._cached: tuple[float, Provider] | None = None

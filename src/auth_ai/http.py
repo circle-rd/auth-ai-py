@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Literal, Protocol
 
-import httpx
+import httpx2
 from pydantic import BaseModel, ConfigDict, ValidationError
 from pydantic.alias_generators import to_camel
 
@@ -38,7 +38,7 @@ class JsonHttp:
         self,
         *,
         base_url: str,
-        http: httpx.AsyncClient,
+        http: httpx2.AsyncClient,
         timeout_seconds: float,
         tokens: HttpTokens,
     ) -> None:
@@ -64,7 +64,7 @@ class JsonHttp:
         """
         response = await self._send(method, path, scope, query, body)
         # A revoked or rotated credential surfaces as 401: retry once with a fresh token.
-        if response.status_code == httpx.codes.UNAUTHORIZED:
+        if response.status_code == httpx2.codes.UNAUTHORIZED:
             self._tokens.invalidate(scope)
             response = await self._send(method, path, scope, query, body)
         if not response.is_success:
@@ -81,7 +81,7 @@ class JsonHttp:
         scope: str,
         query: Mapping[str, str | int | None] | None,
         body: Mapping[str, Any] | None,
-    ) -> httpx.Response:
+    ) -> httpx2.Response:
         params = {k: str(v) for k, v in (query or {}).items() if v is not None}
         token = await self._tokens.get_token(scope)
         try:
@@ -97,11 +97,11 @@ class JsonHttp:
                 timeout=self._timeout,
                 follow_redirects=False,
             )
-        except httpx.HTTPError as err:
+        except httpx2.HTTPError as err:
             raise ERR.API_001("auth-service is unreachable", cause=err) from err
 
 
-def _to_error(response: httpx.Response) -> AuthAiError:
+def _to_error(response: httpx2.Response) -> AuthAiError:
     status = response.status_code
     try:
         parsed = _ApiErrorBody.model_validate(response.json())

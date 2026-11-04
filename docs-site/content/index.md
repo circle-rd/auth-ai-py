@@ -42,7 +42,7 @@ What it does
 ::::u-page-feature{icon="i-lucide-log-out" title="Back-channel logout" description="OIDC Back-Channel Logout verified and replay-protected: signing out of auth-service ends your local sessions and revokes the grant."}
 ::::
 
-::::u-page-feature{icon="i-lucide-wallet" title="Credit wallet and LiteLLM gateway" description="Read the user's prepaid balance and spend, and call an OpenAI-compatible gateway with the user's own token through an httpx client. The gateway debits the wallet; your app never handles a debit."}
+::::u-page-feature{icon="i-lucide-wallet" title="Credit wallet and LiteLLM gateway" description="Read the user's prepaid balance and spend, and call an OpenAI-compatible gateway with the user's own token through an httpx2 client. The gateway debits the wallet; your app never handles a debit."}
 ::::
 
 ::::u-page-feature{icon="i-lucide-receipt" title="Billing and consumption" description="From your backend with a machine token: read a user's subscription, metered usage and invoices, and report consumption with idempotency keys."}
@@ -54,7 +54,7 @@ What it does
 ::::u-page-feature{icon="i-lucide-layers" title="FastAPI, Starlette, any ASGI framework" description="An adapter for FastAPI and Starlette, and framework-agnostic WebRequest and WebResponse handlers you can bridge to any other framework."}
 ::::
 
-::::u-page-feature{icon="i-lucide-code" title="Async and typed" description="Python 3.12 or later, built on httpx and pydantic, shipped with type information (py.typed). Pair it with the TypeScript browser client and the React and Vue bindings."}
+::::u-page-feature{icon="i-lucide-code" title="Async and typed" description="Python 3.12 or later, built on httpx2 and pydantic, shipped with type information (py.typed). Pair it with the TypeScript browser client and the React and Vue bindings."}
 ::::
 
 ::::u-page-feature{icon="i-lucide-triangle-alert" title="Errors safe to show" description="Every failure is an AuthAiError with a stable code. Details stay in your logs; HTTP responses carry the code and a generic message only."}

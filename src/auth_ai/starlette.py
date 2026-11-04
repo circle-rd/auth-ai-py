@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Final
 
-import httpx
+import httpx2
 from starlette.requests import Request  # noqa: TC002 - FastAPI resolves the annotation at runtime
 from starlette.responses import Response
 
@@ -48,7 +48,7 @@ async def to_web_request(request: Request, origin: str, *, with_body: bool = Fal
     """
     query = request.scope.get("query_string", b"").decode("latin-1")
     url = f"{origin}{request.url.path}" + (f"?{query}" if query else "")
-    headers = httpx.Headers(
+    headers = httpx2.Headers(
         [(k.decode("latin-1"), v.decode("latin-1")) for k, v in request.headers.raw]
     )
     body = await _read_body(request) if with_body else b""

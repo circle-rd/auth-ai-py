@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator, Awaitable
 
-import httpx
+import httpx2
 import pytest
 
 from auth_ai import (
@@ -64,7 +64,7 @@ class TestHttpClient:
     ) -> None:
         idp.gateway_handler = lambda _request: json_response({"ok": True})
 
-        async with client.create_http_client(transport=httpx.MockTransport(idp.handle)) as http:
+        async with client.create_http_client(transport=httpx2.MockTransport(idp.handle)) as http:
             await http.post(f"{GATEWAY_URL}/v1/chat/completions", json={"model": "m"})
             await http.get(f"{GATEWAY_URL}/v1/models")
 
@@ -77,7 +77,7 @@ class TestHttpClient:
     ) -> None:
         idp.gateway_handler = lambda _request: json_response({})
 
-        async with client.create_http_client(transport=httpx.MockTransport(idp.handle)) as http:
+        async with client.create_http_client(transport=httpx2.MockTransport(idp.handle)) as http:
             await http.get(
                 f"{GATEWAY_URL}/v1/models", headers={"authorization": "Bearer placeholder"}
             )
@@ -96,7 +96,7 @@ class TestHttpClient:
     async def test_refuses_any_other_origin_so_the_token_cannot_leak(
         self, idp: MockIdp, client: GatewayClient, tokens: CountingTokens, url: str
     ) -> None:
-        async with client.create_http_client(transport=httpx.MockTransport(idp.handle)) as http:
+        async with client.create_http_client(transport=httpx2.MockTransport(idp.handle)) as http:
             with pytest.raises(AuthAiError) as caught:
                 await http.get(url)
 
@@ -108,9 +108,9 @@ class TestHttpClient:
     async def test_drops_the_cached_token_on_a_401_and_returns_the_response(
         self, idp: MockIdp, client: GatewayClient, tokens: CountingTokens
     ) -> None:
-        idp.gateway_handler = lambda _request: httpx.Response(401)
+        idp.gateway_handler = lambda _request: httpx2.Response(401)
 
-        async with client.create_http_client(transport=httpx.MockTransport(idp.handle)) as http:
+        async with client.create_http_client(transport=httpx2.MockTransport(idp.handle)) as http:
             response = await http.get(f"{GATEWAY_URL}/v1/models")
 
         assert response.status_code == 401
@@ -122,7 +122,7 @@ class TestHttpClient:
     ) -> None:
         idp.gateway_handler = lambda _request: json_response({})
 
-        async with client.create_http_client(transport=httpx.MockTransport(idp.handle)) as http:
+        async with client.create_http_client(transport=httpx2.MockTransport(idp.handle)) as http:
             await http.get(f"{GATEWAY_URL}/v1/models")
 
         assert tokens.invalidations == 0
@@ -130,11 +130,11 @@ class TestHttpClient:
     async def test_does_not_follow_redirects_to_another_origin(
         self, idp: MockIdp, client: GatewayClient
     ) -> None:
-        idp.gateway_handler = lambda _request: httpx.Response(
+        idp.gateway_handler = lambda _request: httpx2.Response(
             302, headers={"location": "https://evil.test/steal"}
         )
 
-        async with client.create_http_client(transport=httpx.MockTransport(idp.handle)) as http:
+        async with client.create_http_client(transport=httpx2.MockTransport(idp.handle)) as http:
             response = await http.get(f"{GATEWAY_URL}/v1/models")
 
         assert response.status_code == 302
@@ -144,13 +144,13 @@ class TestHttpClient:
         self, client: GatewayClient
     ) -> None:
         async with client.create_http_client() as default:
-            assert default.timeout == httpx.Timeout(5)
+            assert default.timeout == httpx2.Timeout(5)
         async with client.create_http_client(timeout=2) as custom:
-            assert custom.timeout == httpx.Timeout(2)
+            assert custom.timeout == httpx2.Timeout(2)
 
     async def test_exposes_the_auth_as_an_httpx_auth(self, client: GatewayClient) -> None:
         assert isinstance(client.auth, GatewayAuth)
-        assert isinstance(client.auth, httpx.Auth)
+        assert isinstance(client.auth, httpx2.Auth)
 
 
 class TestOpenAiCompatibleAccess:
@@ -228,15 +228,15 @@ class TestListing:
     async def test_reports_an_unreachable_gateway_as_unavailable(
         self, idp: MockIdp, client: GatewayClient
     ) -> None:
-        def refuse(request: RecordedRequest) -> httpx.Response:
-            raise httpx.ConnectError("connection refused")
+        def refuse(request: RecordedRequest) -> httpx2.Response:
+            raise httpx2.ConnectError("connection refused")
 
         idp.gateway_handler = refuse
 
         err = await rejection(client.list_models())
 
         assert err.code == "GW_004"
-        assert isinstance(err.__cause__, httpx.ConnectError)
+        assert isinstance(err.__cause__, httpx2.ConnectError)
 
 
 class TestPostJson:
@@ -279,7 +279,7 @@ class TestPostJson:
     async def test_maps_a_refusal_without_a_json_body_by_status(
         self, idp: MockIdp, client: GatewayClient
     ) -> None:
-        idp.gateway_handler = lambda _request: httpx.Response(502, text="<html>bad gateway</html>")
+        idp.gateway_handler = lambda _request: httpx2.Response(502, text="<html>bad gateway</html>")
 
         err = await rejection(client.post_json("/v1/embeddings", {"input": "x"}))
 
@@ -289,7 +289,7 @@ class TestPostJson:
     async def test_does_not_retry_a_401_and_drops_the_token(
         self, idp: MockIdp, client: GatewayClient, tokens: CountingTokens
     ) -> None:
-        idp.gateway_handler = lambda _request: httpx.Response(401)
+        idp.gateway_handler = lambda _request: httpx2.Response(401)
 
         err = await rejection(client.post_json("/v1/embeddings", {"input": "x"}))
 
@@ -344,18 +344,18 @@ class TestToGatewayError:
         assert is_insufficient_credit(err)
 
     def test_reports_how_long_to_wait_before_retrying_a_rate_limit(self) -> None:
-        err = to_gateway_error(429, None, httpx.Headers({"retry-after": "12"}))
+        err = to_gateway_error(429, None, httpx2.Headers({"retry-after": "12"}))
 
         assert err.details == {"status": 429, "retryAfterSeconds": 12}
 
     @pytest.mark.parametrize("retry_after", ["soon", "-3", "inf", "nan", ""])
     def test_ignores_a_retry_after_that_is_not_a_usable_delay(self, retry_after: str) -> None:
-        err = to_gateway_error(429, None, httpx.Headers({"retry-after": retry_after}))
+        err = to_gateway_error(429, None, httpx2.Headers({"retry-after": retry_after}))
 
         assert err.details == {"status": 429}
 
     def test_ignores_retry_after_on_other_statuses(self) -> None:
-        err = to_gateway_error(503, None, httpx.Headers({"retry-after": "12"}))
+        err = to_gateway_error(503, None, httpx2.Headers({"retry-after": "12"}))
 
         assert err.details == {"status": 503}
 

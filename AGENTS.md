@@ -65,13 +65,13 @@ shared and must stay aligned.
 | ----------- | ---------------------------------------------------------------- |
 | Runtime     | Python 3.12+ (3.12, 3.13, 3.14 tested), asyncio only             |
 | JOSE        | `joserfc` (JWT verification, JWE) — the OIDC steps around it are in the SDK |
-| HTTP        | `httpx`                                                          |
+| HTTP        | `httpx2`                                                          |
 | Validation  | pydantic v2                                                      |
 | Frameworks  | Starlette / FastAPI (optional extras)                            |
 | Testing     | pytest, pytest-asyncio, a scripted mock identity provider        |
 | Tooling     | ruff, mypy (strict), hatchling                                   |
 
-**Do not reimplement what joserfc or httpx already do.** The OAuth token endpoint exchange
+**Do not reimplement what joserfc or httpx2 already do.** The OAuth token endpoint exchange
 is small and written here on purpose, stateless: it is shared by concurrent users, which
 rules out the stateful OAuth clients of the popular libraries (they keep the last token
 on the instance). Keep every runtime dependency permissively licensed (BSD, MIT, Apache).

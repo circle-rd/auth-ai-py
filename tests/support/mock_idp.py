@@ -1,4 +1,4 @@
-"""A scripted identity provider and gateway behind an `httpx.MockTransport`."""
+"""A scripted identity provider and gateway behind an `httpx2.MockTransport`."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any
 
-import httpx
+import httpx2
 from joserfc import jwt
 from joserfc.jwk import ECKey
 
@@ -24,25 +24,25 @@ GATEWAY_URL = "https://llm.test"
 @dataclass(frozen=True)
 class RecordedRequest:
     method: str
-    url: httpx.URL
-    headers: httpx.Headers
+    url: httpx2.URL
+    headers: httpx2.Headers
     body: bytes
 
     @property
-    def form(self) -> httpx.QueryParams:
+    def form(self) -> httpx2.QueryParams:
         is_form = "application/x-www-form-urlencoded" in self.headers.get("content-type", "")
-        return httpx.QueryParams(self.body.decode() if is_form else "")
+        return httpx2.QueryParams(self.body.decode() if is_form else "")
 
     @property
     def json(self) -> Any:
-        return httpx.Response(200, content=self.body).json()
+        return httpx2.Response(200, content=self.body).json()
 
 
-type Handler = Callable[[RecordedRequest], httpx.Response | Awaitable[httpx.Response]]
+type Handler = Callable[[RecordedRequest], httpx2.Response | Awaitable[httpx2.Response]]
 
 
-def json_response(body: object, status: int = 200) -> httpx.Response:
-    return httpx.Response(status, json=body)
+def json_response(body: object, status: int = 200) -> httpx2.Response:
+    return httpx2.Response(status, json=body)
 
 
 def now_seconds() -> int:
@@ -108,9 +108,9 @@ class MockIdp:
             return {"keys": self.jwks_overrides}
         return {"keys": [self.private_key.as_dict(private=False, alg="ES256")]}
 
-    async def handle(self, request: httpx.Request) -> httpx.Response:
+    async def handle(self, request: httpx2.Request) -> httpx2.Response:
         recorded = RecordedRequest(request.method, request.url, request.headers, request.read())
-        if request.url.host == httpx.URL(GATEWAY_URL).host:
+        if request.url.host == httpx2.URL(GATEWAY_URL).host:
             self.gateway_requests.append(recorded)
             return await _call(self.gateway_handler, recorded)
         self.requests.append(recorded)
@@ -119,26 +119,26 @@ class MockIdp:
             case "/.well-known/openid-configuration":
                 if self.discovery_failures > 0:
                     self.discovery_failures -= 1
-                    return httpx.Response(503, text="unavailable")
+                    return httpx2.Response(503, text="unavailable")
                 return json_response(self.metadata)
             case "/jwks":
                 return json_response(self.jwks)
             case "/token":
                 return await _call(self.token_handler, recorded)
             case "/revoke":
-                return httpx.Response(self.revocation_status)
+                return httpx2.Response(self.revocation_status)
             case "/introspect":
                 return json_response(self.introspection)
             case path if path.startswith("/api/"):
                 return await _call(self.api_handler, recorded)
             case _:
-                return httpx.Response(404, text="not found")
+                return httpx2.Response(404, text="not found")
 
-    def http_client(self) -> httpx.AsyncClient:
-        return httpx.AsyncClient(transport=httpx.MockTransport(self.handle))
+    def http_client(self) -> httpx2.AsyncClient:
+        return httpx2.AsyncClient(transport=httpx2.MockTransport(self.handle))
 
 
-async def _call(handler: Handler, request: RecordedRequest) -> httpx.Response:
+async def _call(handler: Handler, request: RecordedRequest) -> httpx2.Response:
     result = handler(request)
     return await result if inspect.isawaitable(result) else result
 
