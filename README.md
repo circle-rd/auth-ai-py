@@ -48,7 +48,7 @@ async def models(session: Session = Depends(require_auth(handlers))):
 - **Do not reinvent OAuth or JOSE.** Signature, JWT and cookie encryption work stays
   with the maintained library [joserfc](https://jose.authlib.org) and HTTP with
   [httpx2](https://pypi.org/project/httpx2/); the SDK adds what is specific to auth-service
-  on top of them. Every runtime dependency is permissively licensed (BSD-3-Clause or MIT).
+  on top of them. The declared direct runtime dependencies are licensed under BSD-3-Clause or MIT.
 - **Backend-for-frontend by default.** The browser holds one opaque session
   cookie. Access and refresh tokens never reach it.
 - **Fail loud, leak nothing.** Invalid state is rejected, not repaired. Errors
