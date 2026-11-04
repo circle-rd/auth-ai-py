@@ -14,6 +14,8 @@ Sections, when present, appear in this order: `Added`, `Changed`, `Removed`,
 
 <!-- Add user-visible changes here. Move to a dated section at release time. -->
 
+## [0.2.0] - 2026-11-04
+
 ### Added
 
 - **`build_http_client(*, timeout_seconds, transport=None, auth=None)`**: the HTTP client every
