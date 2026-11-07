@@ -374,6 +374,13 @@ class TestUserInfo:
 
         await expect_error(auth.fetch_userinfo("access-1"), "OIDC_003")
 
+    async def test_rejects_a_malformed_userinfo_endpoint(
+        self, auth: AuthClient, idp: MockIdp
+    ) -> None:
+        idp.metadata["userinfo_endpoint"] = "https://[bad/userinfo"
+
+        await expect_error(auth.fetch_userinfo("access-1"), "OIDC_003")
+
     async def test_rejects_a_non_https_userinfo_endpoint_during_sign_in(
         self, auth: AuthClient, idp: MockIdp
     ) -> None:
