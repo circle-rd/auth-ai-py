@@ -19,6 +19,9 @@ if TYPE_CHECKING:
 type FormValue = str | Sequence[str]
 
 
+TOKEN_EXPIRY_FALLBACK_SECONDS = 300
+
+
 class TokenResponse(BaseModel):
     """RFC 6749 §5.1 answer of the token endpoint."""
 
@@ -35,12 +38,17 @@ class TokenResponse(BaseModel):
 def to_token_set(response: TokenResponse) -> TokenSet:
     if response.token_type.lower() != "bearer":
         raise ERR.OIDC_003("The token response is not a bearer token")
-    if response.expires_in is None:
-        raise ERR.OIDC_003("The token response carries no expires_in")
     return TokenSet(
         access_token=response.access_token,
         token_type=response.token_type,
-        expires_at=int(time.time() + response.expires_in),
+        expires_at=int(
+            time.time()
+            + (
+                response.expires_in
+                if response.expires_in is not None
+                else TOKEN_EXPIRY_FALLBACK_SECONDS
+            )
+        ),
         scope=response.scope or None,
         refresh_token=response.refresh_token or None,
         id_token=response.id_token or None,

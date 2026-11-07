@@ -41,11 +41,16 @@ class TestAuthClientConfig:
         err = rejection({**VALID, "redirect_uri": "http://app.example.com/callback"})
         assert err.code == "CFG_001"
 
+    def test_accepts_path_based_issuer_with_trailing_slash(self) -> None:
+        issuer = "https://www.certification.openid.net/test/a/rp-py-basic/"
+        assert parse(issuer=issuer).issuer == issuer
+
     @pytest.mark.parametrize(
         ("label", "override"),
         [
             ("an http issuer", {"issuer": "http://auth.example.com"}),
-            ("an issuer with a trailing slash", {"issuer": "https://auth.example.com/"}),
+            ("an issuer with a query", {"issuer": "https://auth.example.com?tenant=1"}),
+            ("an issuer with a fragment", {"issuer": "https://auth.example.com#tenant"}),
             ("scopes without openid", {"scopes": ["profile"]}),
             ("a non-URL resource", {"resources": ["not a url"]}),
             ("a non-URL redirect URI", {"redirect_uri": "not a url"}),

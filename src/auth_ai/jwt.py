@@ -18,6 +18,7 @@ if TYPE_CHECKING:
 
 # Re-fetch an unknown `kid` (key rotation) at most once per cooldown.
 JWKS_COOLDOWN_SECONDS: Final = 30.0
+JWKS_UNKNOWN_KID_COOLDOWN_SECONDS: Final = 1.0
 JWKS_MAX_AGE_SECONDS: Final = 3600.0
 
 
@@ -35,26 +36,36 @@ class RemoteJwks:
         uri: str,
         http: httpx2.AsyncClient,
         timeout_seconds: float,
+        algorithms: Sequence[str],
     ) -> None:
         self._uri = uri
         self._http = http
         self._timeout = timeout_seconds
+        self._algorithms = frozenset(algorithms)
         self._keys: KeySet | None = None
         self._loaded_at = 0.0
+        self._last_unknown_kid_refresh = 0.0
         self._lock = asyncio.Lock()
 
     async def get(self, kid: str | None) -> KeySet:
         keys = self._keys
-        if keys is not None and self._is_fresh() and self._has(keys, kid):
+        if kid is not None and keys is not None and self._is_fresh() and self._has(keys, kid):
             return keys
         async with self._lock:
             keys = self._keys
-            if keys is not None and self._is_fresh() and self._has(keys, kid):
+            if kid is not None and keys is not None and self._is_fresh() and self._has(keys, kid):
                 return keys
             now = time.monotonic()
             stale = keys is None or now - self._loaded_at >= JWKS_MAX_AGE_SECONDS
-            if stale or now - self._loaded_at >= JWKS_COOLDOWN_SECONDS:
+            unknown_kid = kid is None or (keys is not None and not self._has(keys, kid))
+            refresh_unknown = (
+                unknown_kid
+                and now - self._last_unknown_kid_refresh >= JWKS_UNKNOWN_KID_COOLDOWN_SECONDS
+            )
+            if stale or refresh_unknown or now - self._loaded_at >= JWKS_COOLDOWN_SECONDS:
                 keys = await self._fetch()
+                if refresh_unknown:
+                    self._last_unknown_kid_refresh = time.monotonic()
             if keys is None:
                 raise ERR.TOK_001("The identity provider's keys are unavailable")
             return keys
@@ -66,6 +77,28 @@ class RemoteJwks:
     def _has(keys: KeySet, kid: str | None) -> bool:
         return kid is None or any(key.kid == kid for key in keys.keys)
 
+    def _supports_algorithm(self, key: dict[str, Any]) -> bool:
+        if key.get("use") not in {None, "sig"}:
+            return False
+        if key.get("alg") is not None and key.get("alg") not in self._algorithms:
+            return False
+        for algorithm in self._algorithms:
+            if algorithm.startswith(("RS", "PS")) and key.get("kty") == "RSA":
+                return True
+            if algorithm == "ES256" and key.get("kty") == "EC" and key.get("crv") == "P-256":
+                return True
+            if algorithm == "ES384" and key.get("kty") == "EC" and key.get("crv") == "P-384":
+                return True
+            if algorithm == "ES512" and key.get("kty") == "EC" and key.get("crv") == "P-521":
+                return True
+            if (
+                algorithm == "EdDSA"
+                and key.get("kty") == "OKP"
+                and key.get("crv") in {"Ed25519", "Ed448"}
+            ):
+                return True
+        return False
+
     async def _fetch(self) -> KeySet:
         try:
             response = await self._http.get(
@@ -74,7 +107,17 @@ class RemoteJwks:
                 timeout=self._timeout,
             )
             response.raise_for_status()
-            keys = KeySet.import_key_set(response.json())
+            document = response.json()
+            if isinstance(document, dict) and isinstance(document.get("keys"), list):
+                document = {
+                    **document,
+                    "keys": [
+                        key
+                        for key in document["keys"]
+                        if isinstance(key, dict) and self._supports_algorithm(key)
+                    ],
+                }
+            keys = KeySet.import_key_set(document)
         except (httpx2.HTTPError, ValueError, JoseError) as err:
             raise ERR.TOK_001("Fetching the provider's keys failed", cause=err) from err
         self._keys = keys

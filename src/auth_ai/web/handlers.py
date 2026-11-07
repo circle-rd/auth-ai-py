@@ -102,6 +102,8 @@ class AuthHandlers:
     - `claims_renew_seconds`: how often claims (roles, features…) are renewed.
     - `require_provider_session`: refuse an ID token without `sid`: no back-channel
       logout could ever reach it.
+    - `allow_missing_logout_token_typ`: accept missing `typ` only for a known
+      non-conforming provider; leave disabled by default.
     - `error_redirect`: redirect target of a failed sign-in, with `?error=<code>`;
       JSON when unset.
     - `ai`: adds `/wallet`, `/wallet/stats` and `/models` for the frontend, read with
@@ -123,6 +125,7 @@ class AuthHandlers:
         session_ttl_seconds: int = DEFAULT_SESSION_TTL_SECONDS,
         claims_renew_seconds: int = DEFAULT_CLAIMS_RENEW_SECONDS,
         require_provider_session: bool = True,
+        allow_missing_logout_token_typ: bool = False,
         error_redirect: str | None = None,
         ai: AiClient | None = None,
         replay_store: ReplayStore | None = None,
@@ -146,6 +149,7 @@ class AuthHandlers:
         self._session_ttl = session_ttl_seconds
         self._renew_seconds = claims_renew_seconds
         self._require_provider_session = require_provider_session
+        self._allow_missing_logout_token_typ = allow_missing_logout_token_typ
         self._error_redirect = error_redirect
         self._on_sessions_ended = on_sessions_ended
         self.on_error = on_error
@@ -163,6 +167,7 @@ class AuthHandlers:
         backchannel = BackchannelLogoutHandler(
             auth=auth,
             replay_store=replay_store or MemoryReplayStore(),
+            allow_missing_typ=allow_missing_logout_token_typ,
             on_error=on_error,
             on_logout=self._on_backchannel_logout,
         )

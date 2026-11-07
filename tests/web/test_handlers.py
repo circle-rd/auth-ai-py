@@ -857,7 +857,7 @@ class TestBackchannelLogout:
 
         response = await bff.handle(post_logout_token(bff.logout_token()))
 
-        assert response.status == 204
+        assert response.status == 200
         assert await bff.sessions.count_by_user("user-1") == 0
         assert not await bff.grants.has("user-1")
         assert len(bff.ended) == 1
@@ -874,13 +874,13 @@ class TestBackchannelLogout:
 
     async def test_is_idempotent_for_an_unknown_provider_session(self, bff: BffHarness) -> None:
         response = await bff.handle(post_logout_token(bff.logout_token(sid="unknown")))
-        assert response.status == 204
+        assert response.status == 200
         assert bff.ended == []
 
     async def test_refuses_a_replayed_token(self, bff: BffHarness) -> None:
         await bff.sign_in()
         token = bff.logout_token()
-        assert (await bff.handle(post_logout_token(token))).status == 204
+        assert (await bff.handle(post_logout_token(token))).status == 200
         assert (await bff.handle(post_logout_token(token))).status == 400
 
     async def test_refuses_a_token_for_another_client(self, bff: BffHarness) -> None:

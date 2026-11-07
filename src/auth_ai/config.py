@@ -51,11 +51,11 @@ def _require_url(value: str) -> str:
 
 
 def _require_issuer(value: str) -> str:
-    scheme, host = _split(value)
-    if scheme != "https" or not host:
-        raise ValueError("must be an https URL")
-    if value.endswith("/"):
-        raise ValueError("must not end with a slash: it is compared verbatim to `iss`")
+    parts = urlsplit(value)
+    if parts.scheme != "https" or not parts.hostname:
+        raise ValueError("must be an absolute https URL")
+    if parts.query or parts.fragment or parts.username or parts.password:
+        raise ValueError("must not contain credentials, a query, or a fragment")
     return value
 
 
