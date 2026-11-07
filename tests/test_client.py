@@ -145,6 +145,13 @@ class TestDiscovery:
         del idp.metadata["jwks_uri"]
         await expect_error(auth.start_login(), "OIDC_001")
 
+    async def test_keeps_discovery_working_with_a_non_https_userinfo_endpoint(
+        self, auth: AuthClient, idp: MockIdp
+    ) -> None:
+        idp.metadata["userinfo_endpoint"] = "http://idp.test/userinfo"
+
+        await auth.start_login()
+
     async def test_rejects_a_malformed_document(self, auth: AuthClient, idp: MockIdp) -> None:
         idp.metadata.pop("token_endpoint")
         await expect_error(auth.start_login(), "OIDC_001")
@@ -357,6 +364,62 @@ class TestHandleCallback:
         )
         result = await auth.handle_callback(callback_url(handshake), handshake)
         assert result.session_id is None
+
+
+class TestUserInfo:
+    async def test_rejects_a_non_https_userinfo_endpoint(
+        self, auth: AuthClient, idp: MockIdp
+    ) -> None:
+        idp.metadata["userinfo_endpoint"] = "http://idp.test/userinfo"
+
+        await expect_error(auth.fetch_userinfo("access-1"), "OIDC_003")
+
+    async def test_rejects_a_malformed_userinfo_endpoint(
+        self, auth: AuthClient, idp: MockIdp
+    ) -> None:
+        idp.metadata["userinfo_endpoint"] = "https://[bad/userinfo"
+
+        await expect_error(auth.fetch_userinfo("access-1"), "OIDC_003")
+
+    async def test_rejects_a_non_https_userinfo_endpoint_during_sign_in(
+        self, auth: AuthClient, idp: MockIdp
+    ) -> None:
+        idp.metadata["userinfo_endpoint"] = "http://idp.test/userinfo"
+        handshake = (await auth.start_login()).handshake
+        respond_with_tokens(idp, handshake)
+
+        await expect_error(auth.handle_callback(callback_url(handshake), handshake), "OIDC_003")
+
+    async def test_parses_the_standard_address_claim(self, auth: AuthClient, idp: MockIdp) -> None:
+        idp.userinfo_handler = lambda _request: json_response(
+            {"sub": "user-1", "address": {"locality": "Paris", "country": "FR"}}
+        )
+
+        userinfo = await auth.fetch_userinfo("access-1")
+
+        assert userinfo.address is not None
+        assert userinfo.address.locality == "Paris"
+        assert userinfo.address.country == "FR"
+
+    async def test_never_merges_security_sensitive_claims_from_userinfo(
+        self, auth: AuthClient, idp: MockIdp
+    ) -> None:
+        handshake = (await auth.start_login()).handshake
+        respond_with_tokens(idp, handshake)
+        idp.userinfo_handler = lambda _request: json_response(
+            {
+                "sub": "user-1",
+                "sid": "another-session",
+                "azp": "another-client",
+                "email": "ada@example.com",
+            }
+        )
+
+        result = await auth.handle_callback(callback_url(handshake), handshake)
+
+        assert result.claims.sid == "sid-1"
+        assert result.claims.azp is None
+        assert result.claims.email == "ada@example.com"
 
 
 class TestRefresh:
