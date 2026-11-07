@@ -3,7 +3,7 @@ from __future__ import annotations
 import base64
 import time
 from typing import TYPE_CHECKING, Any
-from urllib.parse import quote_plus
+from urllib.parse import quote_plus, urlsplit
 
 import httpx2
 from pydantic import BaseModel, ConfigDict, ValidationError
@@ -86,6 +86,12 @@ class ProviderEndpoints:
 
     async def userinfo_request(self, url: str, access_token: str) -> dict[str, Any]:
         """GETs UserInfo with the access token. The token never enters an error."""
+        try:
+            scheme = urlsplit(url).scheme
+        except ValueError as err:
+            raise ERR.OIDC_003("The userinfo_endpoint is not a valid URL", cause=err) from err
+        if scheme != "https":
+            raise ERR.OIDC_003("The userinfo_endpoint is not an HTTPS URL")
         response: httpx2.Response | None
         try:
             response = await self._http.get(

@@ -411,6 +411,21 @@ class TestUserInfo:
         assert response.json()["user"]["roles"] == ["editor"]
         assert reported_codes(bff) == ["OIDC_003"]
 
+    async def test_ends_the_session_when_userinfo_subject_differs_on_renewal(
+        self, bff: BffHarness
+    ) -> None:
+        bff.build(claims_renew_seconds=0)
+        cookie = await bff.sign_in()
+        bff.idp.userinfo_handler = lambda _request: json_response({"sub": "user-2"})
+
+        response = await bff.handle(with_session(cookie))
+
+        assert response.status == 401
+        assert await bff.sessions.count_by_user("user-1") == 0
+        with pytest.raises(AuthAiError) as exc:
+            await bff.grants.refresh_tokens("user-1")
+        assert exc.value.code == "TOK_002"
+
     async def test_reports_a_non_2xx_userinfo_answer_as_an_upstream_failure(
         self, bff: BffHarness
     ) -> None:

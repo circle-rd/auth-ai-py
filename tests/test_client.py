@@ -374,6 +374,15 @@ class TestUserInfo:
 
         await expect_error(auth.fetch_userinfo("access-1"), "OIDC_003")
 
+    async def test_rejects_a_non_https_userinfo_endpoint_during_sign_in(
+        self, auth: AuthClient, idp: MockIdp
+    ) -> None:
+        idp.metadata["userinfo_endpoint"] = "http://idp.test/userinfo"
+        handshake = (await auth.start_login()).handshake
+        respond_with_tokens(idp, handshake)
+
+        await expect_error(auth.handle_callback(callback_url(handshake), handshake), "OIDC_003")
+
     async def test_parses_the_standard_address_claim(self, auth: AuthClient, idp: MockIdp) -> None:
         idp.userinfo_handler = lambda _request: json_response(
             {"sub": "user-1", "address": {"locality": "Paris", "country": "FR"}}

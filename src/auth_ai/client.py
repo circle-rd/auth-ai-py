@@ -68,12 +68,6 @@ _USERINFO_MERGEABLE_CLAIMS = frozenset(
 )
 
 
-def _require_https_userinfo(endpoint: str) -> None:
-    """UserInfo carries a bearer token, so it must never travel over plain HTTP."""
-    if urlsplit(endpoint).scheme != "https":
-        raise ERR.OIDC_003("The userinfo_endpoint is not an HTTPS URL")
-
-
 def _s256_challenge(code_verifier: str) -> str:
     digest = hashlib.sha256(code_verifier.encode("ascii")).digest()
     return base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
@@ -183,7 +177,6 @@ class AuthClient:
         endpoint = provider.metadata.userinfo_endpoint
         if not endpoint:
             raise ERR.OIDC_004("The provider advertises no userinfo_endpoint")
-        _require_https_userinfo(endpoint)
         body = await self._endpoints.userinfo_request(endpoint, access_token)
         try:
             return UserInfoClaims.model_validate(body)
@@ -294,7 +287,6 @@ class AuthClient:
         endpoint = provider.metadata.userinfo_endpoint
         if not endpoint:
             return claims
-        _require_https_userinfo(endpoint)
         body = await self._endpoints.userinfo_request(endpoint, access_token)
         try:
             userinfo = UserInfoClaims.model_validate(body)
