@@ -22,14 +22,18 @@ Sections, when present, appear in this order: `Added`, `Changed`, `Removed`,
   The login callback and the claim-renewal path now call the provider's `userinfo_endpoint`
   and fill claims the ID token omits (`email`, `email_verified` and the standard profile
   claims). The UserInfo `sub` is checked against the ID token; claims already present in the
-  ID token are never replaced.
+  ID token are never replaced. UserInfo is now part of the sign-in and claim-renewal path: an
+  unreachable or invalid endpoint raises `OIDC_003`, so check the provider's `userinfo_endpoint`
+  before upgrading. A non-HTTPS endpoint is rejected at the UserInfo call, not during discovery,
+  so other provider operations keep working.
 
 ### Changed
 
 - **RP-initiated logout state**: `/auth/logout` now generates a `state`, sends it to the
   provider's `end_session_endpoint`, and the new `/auth/logout/callback` route accepts the
   provider's redirect even when the state is missing or different. The reference app registers
-  `/auth/logout/callback` as its post-logout URI.
+  `/auth/logout/callback` as its post-logout URI. Applications must register the same absolute
+  post-logout redirect URI with the provider, or the callback will never be reached.
 
 ## [0.2.0] - 2026-11-04
 

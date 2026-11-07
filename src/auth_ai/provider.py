@@ -4,7 +4,6 @@ import asyncio
 import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Final
-from urllib.parse import urlsplit
 
 import httpx2
 from pydantic import BaseModel, ConfigDict, ValidationError
@@ -73,11 +72,6 @@ async def _discover(config: AuthClientConfig, http: httpx2.AsyncClient) -> Provi
         raise ERR.OIDC_001(cause=err) from err
     if metadata.issuer != config.issuer:
         raise ERR.OIDC_001("The discovery document names another issuer")
-    if (
-        metadata.userinfo_endpoint is not None
-        and urlsplit(metadata.userinfo_endpoint).scheme != "https"
-    ):
-        raise ERR.OIDC_001("The userinfo_endpoint is not an HTTPS URL")
 
     algorithms = [
         alg

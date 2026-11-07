@@ -244,10 +244,15 @@ class AuthHandlers:
             claims = await self._auth.apply_userinfo(claims, tokens.access_token)
         except AuthAiError as err:
             # UserInfo only enriches the claims: a provider outage must not turn
-            # an otherwise valid session renewal into a failure.
-            if err.code != "OIDC_003":
+            # an otherwise valid session renewal into a failure. Any other error
+            # (notably a subject mismatch) is terminal, so drop the session
+            # before re-raising instead of refreshing forever.
+            if err.code == "OIDC_003":
+                self._report(err)
+            else:
+                if err.code == "TOK_001":
+                    await self._end_sessions([session])
                 raise
-            self._report(err)
         renewed = Session(
             id=session.id,
             user_id=session.user_id,

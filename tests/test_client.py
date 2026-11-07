@@ -145,11 +145,12 @@ class TestDiscovery:
         del idp.metadata["jwks_uri"]
         await expect_error(auth.start_login(), "OIDC_001")
 
-    async def test_rejects_a_non_https_userinfo_endpoint(
+    async def test_keeps_discovery_working_with_a_non_https_userinfo_endpoint(
         self, auth: AuthClient, idp: MockIdp
     ) -> None:
         idp.metadata["userinfo_endpoint"] = "http://idp.test/userinfo"
-        await expect_error(auth.start_login(), "OIDC_001")
+
+        await auth.start_login()
 
     async def test_rejects_a_malformed_document(self, auth: AuthClient, idp: MockIdp) -> None:
         idp.metadata.pop("token_endpoint")
@@ -366,6 +367,13 @@ class TestHandleCallback:
 
 
 class TestUserInfo:
+    async def test_rejects_a_non_https_userinfo_endpoint(
+        self, auth: AuthClient, idp: MockIdp
+    ) -> None:
+        idp.metadata["userinfo_endpoint"] = "http://idp.test/userinfo"
+
+        await expect_error(auth.fetch_userinfo("access-1"), "OIDC_003")
+
     async def test_parses_the_standard_address_claim(self, auth: AuthClient, idp: MockIdp) -> None:
         idp.userinfo_handler = lambda _request: json_response(
             {"sub": "user-1", "address": {"locality": "Paris", "country": "FR"}}
