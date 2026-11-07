@@ -163,7 +163,9 @@ class BffHarness:
         """Handlers of their own, on the shared session store and provider."""
         auth_config: dict[str, str] = {
             "redirect_uri": redirect_uri,
-            "post_logout_redirect_uri": post_logout_redirect_uri or f"{ORIGIN}/",
+            "post_logout_redirect_uri": (
+                post_logout_redirect_uri if post_logout_redirect_uri is not None else f"{ORIGIN}/"
+            ),
         }
         if gateway:
             auth_config["gateway_url"] = GATEWAY_URL

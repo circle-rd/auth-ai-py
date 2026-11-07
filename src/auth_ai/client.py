@@ -35,6 +35,38 @@ if TYPE_CHECKING:
 _PKCE_VERIFIER_BYTES = 48
 _RANDOM_BYTES = 32
 
+# UserInfo may repeat these ID-token claims. Security-sensitive token claims
+# (`sid`, `azp`, `iss`, `aud`, `exp`, `iat`) are never copied from UserInfo.
+_USERINFO_MERGEABLE_CLAIMS = frozenset(
+    {
+        "name",
+        "given_name",
+        "family_name",
+        "middle_name",
+        "nickname",
+        "preferred_username",
+        "profile",
+        "picture",
+        "website",
+        "gender",
+        "birthdate",
+        "zoneinfo",
+        "locale",
+        "address",
+        "updated_at",
+        "email",
+        "email_verified",
+        "phone_number",
+        "phone_number_verified",
+        "roles",
+        "permissions",
+        "features",
+        "plan",
+        "org_id",
+        "company",
+    }
+)
+
 
 def _s256_challenge(code_verifier: str) -> str:
     digest = hashlib.sha256(code_verifier.encode("ascii")).digest()
@@ -149,7 +181,7 @@ class AuthClient:
         try:
             return UserInfoClaims.model_validate(body)
         except ValidationError as err:
-            raise ERR.TOK_001("The UserInfo response has an unexpected shape", cause=err) from err
+            raise ERR.OIDC_003("The UserInfo response has an unexpected shape", cause=err) from err
 
     async def apply_userinfo(self, claims: IdTokenClaims, access_token: str) -> IdTokenClaims:
         """Fills claims the ID token omits from UserInfo, without replacing values.
@@ -259,15 +291,20 @@ class AuthClient:
         try:
             userinfo = UserInfoClaims.model_validate(body)
         except ValidationError as err:
-            raise ERR.TOK_001("The UserInfo response has an unexpected shape", cause=err) from err
+            raise ERR.OIDC_003("The UserInfo response has an unexpected shape", cause=err) from err
         if userinfo.sub != claims.sub:
             raise ERR.TOK_001("The UserInfo response belongs to another user")
         updates = {
             name: value
             for name, value in userinfo.model_dump(exclude_none=True).items()
-            if name != "sub" and getattr(claims, name, None) is None
+            if name in _USERINFO_MERGEABLE_CLAIMS and getattr(claims, name, None) is None
         }
-        return claims.model_copy(update=updates) if updates else claims
+        if not updates:
+            return claims
+        try:
+            return IdTokenClaims.model_validate({**claims.model_dump(), **updates})
+        except ValidationError as err:
+            raise ERR.OIDC_003("The UserInfo response has an unexpected shape", cause=err) from err
 
     async def _verify_id_token(
         self, provider: Provider, id_token: str, *, nonce: str | None = None

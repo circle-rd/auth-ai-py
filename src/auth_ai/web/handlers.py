@@ -240,7 +240,14 @@ class AuthHandlers:
         if claims.sub != session.user_id:
             await self._end_sessions([session])
             raise ERR.TOK_001("The refreshed ID token belongs to another user")
-        claims = await self._auth.apply_userinfo(claims, tokens.access_token)
+        try:
+            claims = await self._auth.apply_userinfo(claims, tokens.access_token)
+        except AuthAiError as err:
+            # UserInfo only enriches the claims: a provider outage must not turn
+            # an otherwise valid session renewal into a failure.
+            if err.code != "OIDC_003":
+                raise
+            self._report(err)
         renewed = Session(
             id=session.id,
             user_id=session.user_id,
@@ -449,7 +456,7 @@ class AuthHandlers:
         )
         if "application/json" in (request.header("accept") or ""):
             return json_response({"logoutUrl": logout_url}, 200, headers)
-        return redirect_response(logout_url or self._default_redirect, 303, headers)
+        return redirect_response(logout_url or next_path, 303, headers)
 
     async def _logout_callback(self, request: WebRequest) -> WebResponse:
         """Handles the OP's post-logout redirect.

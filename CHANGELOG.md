@@ -14,7 +14,7 @@ Sections, when present, appear in this order: `Added`, `Changed`, `Removed`,
 
 <!-- Add user-visible changes here. Move to a dated section at release time. -->
 
-## [0.2.1] - 2026-11-07
+## [0.3.0] - 2026-11-07
 
 ### Added
 
@@ -99,5 +99,7 @@ wire contract and error codes.
   families (auth-service signs with ES256).
 - A server-side failure (5xx answer) of the sign-in routes is reported to `on_error`.
 
-[Unreleased]: https://github.com/circle-rd/auth-ai-py/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/circle-rd/auth-ai-py/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/circle-rd/auth-ai-py/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/circle-rd/auth-ai-py/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/circle-rd/auth-ai-py/releases/tag/v0.1.0

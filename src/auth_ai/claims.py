@@ -41,6 +41,19 @@ class IdTokenClaims(_Claims):
     phone_number: str | None = None
 
 
+class AddressClaim(BaseModel):
+    """The OIDC `address` claim (OpenID Connect Core 1.0 §5.1.1)."""
+
+    model_config = ConfigDict(extra="allow", frozen=True)
+
+    formatted: str | None = None
+    street_address: str | None = None
+    locality: str | None = None
+    region: str | None = None
+    postal_code: str | None = None
+    country: str | None = None
+
+
 class UserInfoClaims(BaseModel):
     """Standard claims returned by the UserInfo endpoint.
 
@@ -65,6 +78,7 @@ class UserInfoClaims(BaseModel):
     birthdate: str | None = None
     zoneinfo: str | None = None
     locale: str | None = None
+    address: AddressClaim | None = None
     updated_at: int | float | None = None
     email: str | None = None
     email_verified: bool | None = None
@@ -75,6 +89,7 @@ class UserInfoClaims(BaseModel):
     features: dict[str, FeatureValue] | None = None
     plan: str | None = None
     org_id: str | None = None
+    company: str | None = None
 
 
 class AccessTokenClaims(_Claims):
