@@ -10,12 +10,13 @@ import pytest
 from joserfc import jwe
 
 from auth_ai import AuthAiError
-from auth_ai.messages import WebRequest
+from auth_ai.messages import WebRequest, WebResponse
 from auth_ai.web.seal import derive_seal_key
 from auth_ai.web.sessions import MemorySessionStore, Session
 from tests.support.bff import (
     FORM,
     LOGIN_COOKIE,
+    LOGOUT_COOKIE,
     ORIGIN,
     SECRET,
     SESSION_COOKIE,
@@ -295,6 +296,195 @@ class TestCallback:
         assert "Max-Age=120" in callback.header_values("set-cookie")[1]
         [stored] = await bff.sessions.delete_by_provider_session("sid-1")
         assert stored.expires_at - stored.created_at == 120
+
+
+class TestUserInfo:
+    async def test_fills_the_email_from_userinfo_when_the_id_token_omits_it(
+        self, bff: BffHarness
+    ) -> None:
+        login = await bff.start_login()
+        request = bff.callback_request(login)
+        bff.idp.token_handler = lambda _request: json_response(
+            {
+                "access_token": "access-0",
+                "token_type": "Bearer",
+                "expires_in": 3600,
+                "refresh_token": "refresh-0",
+                "id_token": bff.idp.id_token(nonce=bff.nonce, sid="sid-1", name="Ada"),
+            }
+        )
+        bff.idp.userinfo_handler = lambda _request: json_response(
+            {
+                "sub": "user-1",
+                "email": "ada@example.com",
+                "email_verified": True,
+            }
+        )
+
+        callback = await bff.handle(request)
+
+        assert callback.status == 303
+        cookie = cookies_of(callback)[SESSION_COOKIE]
+        body = (await bff.handle(with_session(cookie))).json()
+        assert body["user"]["email"] == "ada@example.com"
+        assert body["user"]["emailVerified"] is True
+        [userinfo] = bff.idp.requests_to("/userinfo")
+        assert userinfo.headers["authorization"] == "Bearer access-0"
+
+    async def test_does_not_replace_id_token_claims_with_userinfo(self, bff: BffHarness) -> None:
+        login = await bff.start_login()
+        request = bff.callback_request(login)
+        bff.idp.token_handler = lambda _request: json_response(
+            {
+                "access_token": "access-0",
+                "token_type": "Bearer",
+                "expires_in": 3600,
+                "id_token": bff.idp.id_token(nonce=bff.nonce, sid="sid-1", name="From ID token"),
+            }
+        )
+        bff.idp.userinfo_handler = lambda _request: json_response(
+            {"sub": "user-1", "name": "From UserInfo"}
+        )
+
+        callback = await bff.handle(request)
+        cookie = cookies_of(callback)[SESSION_COOKIE]
+        body = (await bff.handle(with_session(cookie))).json()
+
+        assert body["user"]["name"] == "From ID token"
+
+    async def test_refuses_userinfo_for_another_subject(self, bff: BffHarness) -> None:
+        login = await bff.start_login()
+        request = bff.callback_request(login)
+        bff.idp.token_handler = lambda _request: json_response(
+            {
+                "access_token": "access-0",
+                "token_type": "Bearer",
+                "expires_in": 3600,
+                "id_token": bff.idp.id_token(nonce=bff.nonce, sid="sid-1"),
+            }
+        )
+        bff.idp.userinfo_handler = lambda _request: json_response(
+            {"sub": "someone-else", "email": "other@example.com"}
+        )
+
+        response = await bff.handle(request)
+
+        assert response.status == 403
+        assert response.json()["error"]["code"] == "SES_005"
+        assert reported_codes(bff) == ["TOK_001"]
+        assert await bff.sessions.count_by_user("user-1") == 0
+
+    async def test_fills_the_email_from_userinfo_when_claims_are_renewed(
+        self, bff: BffHarness
+    ) -> None:
+        bff.build(claims_renew_seconds=0)
+        cookie = await bff.sign_in()
+        bff.idp.token_handler = lambda _request: json_response(
+            {
+                "access_token": "access-renewed",
+                "token_type": "Bearer",
+                "expires_in": 60,
+                "id_token": bff.idp.id_token(sid="sid-1", name="Ada"),
+            }
+        )
+        bff.idp.userinfo_handler = lambda _request: json_response(
+            {"sub": "user-1", "email": "renewed@example.com", "email_verified": True}
+        )
+
+        body = (await bff.handle(with_session(cookie))).json()
+
+        assert body["user"]["email"] == "renewed@example.com"
+        assert body["user"]["emailVerified"] is True
+        userinfo = bff.idp.requests_to("/userinfo")[-1]
+        assert userinfo.headers["authorization"] == "Bearer access-renewed"
+
+    async def test_keeps_the_id_token_claims_when_userinfo_is_unavailable_on_renewal(
+        self, bff: BffHarness
+    ) -> None:
+        bff.build(claims_renew_seconds=0)
+        cookie = await bff.sign_in()
+        bff.idp.userinfo_handler = lambda _request: json_response({}, 503)
+
+        response = await bff.handle(with_session(cookie))
+
+        assert response.status == 200
+        assert response.json()["user"]["roles"] == ["editor"]
+        assert reported_codes(bff) == ["OIDC_003"]
+
+    async def test_ends_the_session_when_userinfo_subject_differs_on_renewal(
+        self, bff: BffHarness
+    ) -> None:
+        bff.build(claims_renew_seconds=0)
+        cookie = await bff.sign_in()
+        bff.idp.userinfo_handler = lambda _request: json_response({"sub": "user-2"})
+
+        response = await bff.handle(with_session(cookie))
+
+        assert response.status == 401
+        assert await bff.sessions.count_by_user("user-1") == 0
+        with pytest.raises(AuthAiError) as exc:
+            await bff.grants.refresh_tokens("user-1")
+        assert exc.value.code == "TOK_002"
+
+    async def test_reports_a_non_2xx_userinfo_answer_as_an_upstream_failure(
+        self, bff: BffHarness
+    ) -> None:
+        response = await self._login_with_userinfo(bff, lambda _request: json_response({}, 503))
+
+        assert response.status == 403
+        assert reported_codes(bff) == ["OIDC_003"]
+        assert await bff.sessions.count_by_user("user-1") == 0
+
+    async def test_reports_a_non_json_userinfo_body_as_an_upstream_failure(
+        self, bff: BffHarness
+    ) -> None:
+        response = await self._login_with_userinfo(
+            bff, lambda _request: httpx2.Response(200, text="not json")
+        )
+
+        assert response.status == 403
+        assert reported_codes(bff) == ["OIDC_003"]
+
+    async def test_reports_a_non_object_userinfo_body_as_an_upstream_failure(
+        self, bff: BffHarness
+    ) -> None:
+        response = await self._login_with_userinfo(
+            bff, lambda _request: json_response([{"sub": "user-1"}])
+        )
+
+        assert response.status == 403
+        assert reported_codes(bff) == ["OIDC_003"]
+
+    async def test_reports_a_userinfo_transport_failure_without_retaining_the_request(
+        self, bff: BffHarness
+    ) -> None:
+        def unreachable(_request: RecordedRequest) -> httpx2.Response:
+            raise httpx2.ConnectError("connection refused")
+
+        response = await self._login_with_userinfo(bff, unreachable)
+
+        assert response.status == 403
+        assert reported_codes(bff) == ["OIDC_003"]
+        [reported] = [err for err in bff.errors if isinstance(err, AuthAiError)]
+        assert reported.__cause__ is None
+        assert reported.__context__ is None
+
+    async def _login_with_userinfo(
+        self, bff: BffHarness, handler: Callable[[RecordedRequest], httpx2.Response]
+    ) -> WebResponse:
+        login = await bff.start_login()
+        request = bff.callback_request(login)
+        bff.idp.token_handler = lambda _request: json_response(
+            {
+                "access_token": "access-0",
+                "token_type": "Bearer",
+                "expires_in": 3600,
+                "refresh_token": "refresh-0",
+                "id_token": bff.idp.id_token(nonce=bff.nonce, sid="sid-1"),
+            }
+        )
+        bff.idp.userinfo_handler = handler
+        return await bff.handle(request)
 
 
 class TestMe:
@@ -597,6 +787,66 @@ class TestLogout:
         cookie = await bff.sign_in()
         await bff.handle(self.logout(cookie, origin=ORIGIN))
         assert ended == ["user-1"]
+
+
+class TestLogoutCallback:
+    async def test_sends_state_and_returns_through_the_logout_callback(
+        self, bff: BffHarness
+    ) -> None:
+        bff.build(post_logout_redirect_uri=f"{ORIGIN}/auth/logout/callback")
+        cookie = await bff.sign_in()
+        response = await bff.handle(self.logout(cookie, origin=ORIGIN, accept="application/json"))
+        assert response.status == 200
+        logout_url = response.json()["logoutUrl"]
+        state = query_of(logout_url)["state"][0]
+        assert state
+        assert query_of(logout_url)["post_logout_redirect_uri"] == [
+            f"{ORIGIN}/auth/logout/callback"
+        ]
+        sealed = cookies_of(response)[LOGOUT_COOKIE]
+
+        callback = await bff.handle(
+            get(
+                f"/auth/logout/callback?state={state}",
+                {"cookie": cookie_header((LOGOUT_COOKIE, sealed))},
+            )
+        )
+
+        assert callback.status == 303
+        assert callback.header("location") == "/"
+        assert "Max-Age=0" in callback.header_values("set-cookie")[0]
+
+    @pytest.mark.parametrize("query", ["", "?state=other"])
+    async def test_accepts_a_missing_or_different_state_after_logout(
+        self, bff: BffHarness, query: str
+    ) -> None:
+        bff.build(post_logout_redirect_uri=f"{ORIGIN}/auth/logout/callback")
+        cookie = await bff.sign_in()
+        response = await bff.handle(self.logout(cookie, origin=ORIGIN, accept="application/json"))
+        sealed = cookies_of(response)[LOGOUT_COOKIE]
+
+        callback = await bff.handle(
+            get(
+                f"/auth/logout/callback{query}",
+                {"cookie": cookie_header((LOGOUT_COOKIE, sealed))},
+            )
+        )
+
+        assert callback.status == 303
+        assert callback.header("location") == "/"
+
+    async def test_redirects_to_the_default_page_without_a_logout_cookie(
+        self, bff: BffHarness
+    ) -> None:
+        response = await bff.handle(get("/auth/logout/callback?state=missing"))
+        assert response.status == 303
+        assert response.header("location") == "/"
+
+    def logout(self, cookie: str, **headers: str) -> WebRequest:
+        return post(
+            "/auth/logout",
+            {**headers, "cookie": cookie_header((SESSION_COOKIE, cookie))},
+        )
 
 
 class TestBackchannelLogout:

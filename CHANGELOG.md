@@ -14,6 +14,27 @@ Sections, when present, appear in this order: `Added`, `Changed`, `Removed`,
 
 <!-- Add user-visible changes here. Move to a dated section at release time. -->
 
+## [0.3.0] - 2026-11-07
+
+### Added
+
+- **UserInfo enrichment**: `AuthClient.fetch_userinfo()` and `AuthClient.apply_userinfo()`.
+  The login callback and the claim-renewal path now call the provider's `userinfo_endpoint`
+  and fill claims the ID token omits (`email`, `email_verified` and the standard profile
+  claims). The UserInfo `sub` is checked against the ID token; claims already present in the
+  ID token are never replaced. UserInfo is now part of the sign-in and claim-renewal path: an
+  unreachable or invalid endpoint raises `OIDC_003`, so check the provider's `userinfo_endpoint`
+  before upgrading. A non-HTTPS endpoint is rejected at the UserInfo call, not during discovery,
+  so other provider operations keep working.
+
+### Changed
+
+- **RP-initiated logout state**: `/auth/logout` now generates a `state`, sends it to the
+  provider's `end_session_endpoint`, and the new `/auth/logout/callback` route accepts the
+  provider's redirect even when the state is missing or different. The reference app registers
+  `/auth/logout/callback` as its post-logout URI. Applications must register the same absolute
+  post-logout redirect URI with the provider, or the callback will never be reached.
+
 ## [0.2.0] - 2026-11-04
 
 ### Added
@@ -82,5 +103,7 @@ wire contract and error codes.
   families (auth-service signs with ES256).
 - A server-side failure (5xx answer) of the sign-in routes is reported to `on_error`.
 
-[Unreleased]: https://github.com/circle-rd/auth-ai-py/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/circle-rd/auth-ai-py/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/circle-rd/auth-ai-py/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/circle-rd/auth-ai-py/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/circle-rd/auth-ai-py/releases/tag/v0.1.0

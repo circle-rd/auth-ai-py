@@ -9,7 +9,7 @@ from urllib.parse import parse_qs, urlencode, urlsplit, urlunsplit
 
 from pydantic import ValidationError
 
-from .claims import IdTokenClaims
+from .claims import IdTokenClaims, UserInfoClaims
 from .config import AuthClientConfig
 from .errors import ERR
 from .id_token import check_id_token_binding
@@ -34,6 +34,38 @@ if TYPE_CHECKING:
 
 _PKCE_VERIFIER_BYTES = 48
 _RANDOM_BYTES = 32
+
+# UserInfo may repeat these ID-token claims. Security-sensitive token claims
+# (`sid`, `azp`, `iss`, `aud`, `exp`, `iat`) are never copied from UserInfo.
+_USERINFO_MERGEABLE_CLAIMS = frozenset(
+    {
+        "name",
+        "given_name",
+        "family_name",
+        "middle_name",
+        "nickname",
+        "preferred_username",
+        "profile",
+        "picture",
+        "website",
+        "gender",
+        "birthdate",
+        "zoneinfo",
+        "locale",
+        "address",
+        "updated_at",
+        "email",
+        "email_verified",
+        "phone_number",
+        "phone_number_verified",
+        "roles",
+        "permissions",
+        "features",
+        "plan",
+        "org_id",
+        "company",
+    }
+)
 
 
 def _s256_challenge(code_verifier: str) -> str:
@@ -133,10 +165,33 @@ class AuthClient:
         if tokens.id_token is None:
             raise ERR.OIDC_002("The token response carries no ID token")
         claims = await self._verify_id_token(provider, tokens.id_token, nonce=handshake.nonce)
+        claims = await self._apply_userinfo(provider, claims, tokens.access_token)
         return LoginResult(tokens=tokens, claims=claims, session_id=claims.sid)
 
     async def verify_id_token(self, id_token: str) -> IdTokenClaims:
         return await self._verify_id_token(await self._provider.get(), id_token)
+
+    async def fetch_userinfo(self, access_token: str) -> UserInfoClaims:
+        """Reads UserInfo with the access token, for the current provider session."""
+        provider = await self._provider.get()
+        endpoint = provider.metadata.userinfo_endpoint
+        if not endpoint:
+            raise ERR.OIDC_004("The provider advertises no userinfo_endpoint")
+        body = await self._endpoints.userinfo_request(endpoint, access_token)
+        try:
+            return UserInfoClaims.model_validate(body)
+        except ValidationError as err:
+            raise ERR.OIDC_003("The UserInfo response has an unexpected shape", cause=err) from err
+
+    async def apply_userinfo(self, claims: IdTokenClaims, access_token: str) -> IdTokenClaims:
+        """Fills claims the ID token omits from UserInfo, without replacing values.
+
+        The provider may keep email out of the ID token when it issues an access
+        token; UserInfo is then the authoritative source for the profile and
+        email claims. Registered and entitlement claims already present in the ID
+        token are never overwritten.
+        """
+        return await self._apply_userinfo(await self._provider.get(), claims, access_token)
 
     async def refresh(self, refresh_token: str, *, resource: str | None = None) -> TokenSet:
         """Exchanges a refresh token for fresh tokens.
@@ -225,6 +280,31 @@ class AuthClient:
         if resource:
             form["resource"] = resource
         return await self._endpoints.token_request(provider.metadata.token_endpoint, form)
+
+    async def _apply_userinfo(
+        self, provider: Provider, claims: IdTokenClaims, access_token: str
+    ) -> IdTokenClaims:
+        endpoint = provider.metadata.userinfo_endpoint
+        if not endpoint:
+            return claims
+        body = await self._endpoints.userinfo_request(endpoint, access_token)
+        try:
+            userinfo = UserInfoClaims.model_validate(body)
+        except ValidationError as err:
+            raise ERR.OIDC_003("The UserInfo response has an unexpected shape", cause=err) from err
+        if userinfo.sub != claims.sub:
+            raise ERR.TOK_001("The UserInfo response belongs to another user")
+        updates = {
+            name: value
+            for name, value in userinfo.model_dump(exclude_none=True).items()
+            if name in _USERINFO_MERGEABLE_CLAIMS and getattr(claims, name, None) is None
+        }
+        if not updates:
+            return claims
+        try:
+            return IdTokenClaims.model_validate({**claims.model_dump(), **updates})
+        except ValidationError as err:
+            raise ERR.OIDC_003("The UserInfo response has an unexpected shape", cause=err) from err
 
     async def _verify_id_token(
         self, provider: Provider, id_token: str, *, nonce: str | None = None

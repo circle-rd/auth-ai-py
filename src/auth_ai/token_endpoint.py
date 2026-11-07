@@ -3,7 +3,7 @@ from __future__ import annotations
 import base64
 import time
 from typing import TYPE_CHECKING, Any
-from urllib.parse import quote_plus
+from urllib.parse import quote_plus, urlsplit
 
 import httpx2
 from pydantic import BaseModel, ConfigDict, ValidationError
@@ -83,6 +83,44 @@ class ProviderEndpoints:
             )
         except httpx2.HTTPError as err:
             raise ERR.OIDC_003(cause=err) from err
+
+    async def userinfo_request(self, url: str, access_token: str) -> dict[str, Any]:
+        """GETs UserInfo with the access token. The token never enters an error."""
+        try:
+            scheme = urlsplit(url).scheme
+        except ValueError as err:
+            raise ERR.OIDC_003("The userinfo_endpoint is not a valid URL", cause=err) from err
+        if scheme != "https":
+            raise ERR.OIDC_003("The userinfo_endpoint is not an HTTPS URL")
+        response: httpx2.Response | None
+        try:
+            response = await self._http.get(
+                url,
+                headers={
+                    "authorization": f"Bearer {access_token}",
+                    "accept": "application/json",
+                },
+                timeout=self._config.timeout_seconds,
+                follow_redirects=False,
+            )
+        except httpx2.HTTPError:
+            # Raised outside the handler: the transport error retains the request,
+            # including its bearer token, and must not reach on_error.
+            response = None
+        if response is None:
+            raise ERR.OIDC_003("The UserInfo request failed")
+        if not response.is_success:
+            raise ERR.OIDC_003(
+                f"UserInfo endpoint answered HTTP {response.status_code}",
+                details={"status": response.status_code},
+            )
+        try:
+            body = response.json()
+        except ValueError as err:
+            raise ERR.OIDC_003("The UserInfo response is not JSON", cause=err) from err
+        if not isinstance(body, dict):
+            raise ERR.OIDC_003("The UserInfo response has an unexpected shape")
+        return body
 
     async def token_request(self, url: str, form: Mapping[str, FormValue]) -> TokenSet:
         response = await self.post(url, form)
