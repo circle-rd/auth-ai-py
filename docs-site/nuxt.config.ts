@@ -1,5 +1,15 @@
 export default defineNuxtConfig({
   extends: ["docus"],
+  css: ["~/circle-theme.css"],
+  fonts: {
+    families: [
+      {
+        name: "Lato",
+        provider: "google",
+        weights: [100, 300, 400, 700],
+      },
+    ],
+  },
   app: {
     baseURL: process.env.NUXT_APP_BASE_URL ?? "/auth-ai/python/",
   },

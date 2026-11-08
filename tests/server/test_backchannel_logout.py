@@ -69,7 +69,11 @@ def logout_claims(**overrides: Any) -> dict[str, Any]:
 
 
 def logout_token(idp: MockIdp, typ: str | None = "logout+jwt", **overrides: Any) -> str:
-    return idp.sign_jwt(logout_claims(**overrides), typ=typ)
+    return idp.sign_jwt(
+        logout_claims(**overrides),
+        typ=typ,
+        omit_typ=typ is None,
+    )
 
 
 def post(token: str | None, *, headers: dict[str, str] | None = None) -> WebRequest:
@@ -89,10 +93,25 @@ class TestBackchannelLogoutHandler:
     ) -> None:
         response = await handle(post(logout_token(idp)))
 
-        assert response.status == 204
+        assert response.status == 200
         assert response.header("cache-control") == "no-store"
         assert recorder.events == [BackchannelLogoutEvent(sid="sid-1", sub="user-1")]
         assert recorder.errors == []
+
+    async def test_accepts_missing_typ_only_when_explicitly_configured(
+        self, idp: MockIdp, auth: AuthClient, recorder: Recorder
+    ) -> None:
+        handler = BackchannelLogoutHandler(
+            auth=auth,
+            on_logout=recorder.on_logout,
+            allow_missing_typ=True,
+            on_error=recorder.on_error,
+        )
+
+        response = await handler(post(logout_token(idp, typ=None)))
+
+        assert response.status == 200
+        assert recorder.events == [BackchannelLogoutEvent(sid="sid-1", sub="user-1")]
 
     async def test_supports_a_synchronous_callback(self, idp: MockIdp, auth: AuthClient) -> None:
         events: list[BackchannelLogoutEvent] = []
@@ -100,7 +119,7 @@ class TestBackchannelLogoutHandler:
 
         response = await handler(post(logout_token(idp)))
 
-        assert response.status == 204
+        assert response.status == 200
         assert events == [BackchannelLogoutEvent(sid="sid-1", sub="user-1")]
 
     async def test_refuses_a_replayed_token(
@@ -108,7 +127,7 @@ class TestBackchannelLogoutHandler:
     ) -> None:
         token = logout_token(idp)
 
-        assert (await handle(post(token))).status == 204
+        assert (await handle(post(token))).status == 200
         replay = await handle(post(token))
 
         assert replay.status == 400
@@ -172,7 +191,7 @@ class TestBackchannelLogoutHandler:
     ) -> None:
         await handle(post(logout_token(idp, jti="shared-jti", nonce="n")))
 
-        assert (await handle(post(logout_token(idp, jti="shared-jti")))).status == 204
+        assert (await handle(post(logout_token(idp, jti="shared-jti")))).status == 200
 
     @pytest.mark.parametrize("method", ["GET", "PUT", "DELETE"])
     async def test_answers_405_to_anything_but_post(

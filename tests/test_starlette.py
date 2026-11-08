@@ -240,7 +240,7 @@ class TestRoutes:
             content=urlencode({"logout_token": bff.logout_token()}),
         )
 
-        assert response.status_code == 204
+        assert response.status_code == 200
         assert response.content == b""
         assert (await client.get("/auth/me", headers=as_user(cookie))).status_code == 401
 

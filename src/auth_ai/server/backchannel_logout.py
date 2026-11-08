@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Final, Protocol
 from urllib.parse import parse_qs
 
+from joserfc.jws import extract_compact
+
 from ..errors import ERR
 from ..messages import NO_STORE, WebRequest, WebResponse, json_response
 
@@ -64,13 +66,27 @@ class LogoutAuth(Protocol):
 
 
 async def verify_logout_token(
-    auth: LogoutAuth, token: str, replay_store: ReplayStore
+    auth: LogoutAuth,
+    token: str,
+    replay_store: ReplayStore,
+    *,
+    allow_missing_typ: bool = False,
 ) -> LogoutTokenClaims:
-    """Validates an OIDC Back-Channel Logout token (spec §2.6) and records its `jti`.
+    """Validates an OIDC Back-Channel Logout token and records its `jti`.
 
     auth-service always names both the session and the user.
     """
-    payload = await auth.verify_jwt(token, audience=auth.config.client_id, typ=LOGOUT_TOKEN_TYP)
+    if allow_missing_typ:
+        typ = extract_compact(token.encode()).headers().get("typ")
+        if typ is not None and typ not in {LOGOUT_TOKEN_TYP, f"application/{LOGOUT_TOKEN_TYP}"}:
+            raise ERR.TOK_001("The logout token has an unexpected typ header")
+        payload = await auth.verify_jwt(token, audience=auth.config.client_id)
+    else:
+        payload = await auth.verify_jwt(
+            token,
+            audience=auth.config.client_id,
+            typ=LOGOUT_TOKEN_TYP,
+        )
 
     events = payload.get("events")
     if not isinstance(events, dict) or LOGOUT_EVENT not in events:
@@ -129,11 +145,13 @@ class BackchannelLogoutHandler:
         auth: LogoutAuth,
         on_logout: LogoutCallback,
         replay_store: ReplayStore | None = None,
+        allow_missing_typ: bool = False,
         on_error: ErrorCallback | None = None,
     ) -> None:
         self._auth = auth
         self._on_logout = on_logout
         self._replay_store = replay_store or MemoryReplayStore()
+        self._allow_missing_typ = allow_missing_typ
         self._on_error = on_error
 
     async def __call__(self, request: WebRequest) -> WebResponse:
@@ -153,7 +171,12 @@ class BackchannelLogoutHandler:
             return _error(400, "invalid_request")
 
         try:
-            claims = await verify_logout_token(self._auth, values[0], self._replay_store)
+            claims = await verify_logout_token(
+                self._auth,
+                values[0],
+                self._replay_store,
+                allow_missing_typ=self._allow_missing_typ,
+            )
         except Exception as err:  # noqa: BLE001
             self._report(err)
             return _error(400, "invalid_request")
@@ -165,7 +188,7 @@ class BackchannelLogoutHandler:
         except Exception as err:  # noqa: BLE001
             self._report(err)
             return _error(500, "server_error")
-        return WebResponse(204, (("cache-control", NO_STORE),))
+        return WebResponse(200, (("cache-control", NO_STORE),))
 
     def _report(self, err: BaseException) -> None:
         if self._on_error is not None:

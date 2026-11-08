@@ -58,7 +58,7 @@ class Provider:
 
 
 async def _discover(config: AuthClientConfig, http: httpx2.AsyncClient) -> Provider:
-    url = f"{config.issuer}/.well-known/openid-configuration"
+    url = f"{config.issuer.rstrip('/')}/.well-known/openid-configuration"
     try:
         response = await http.get(
             url,
@@ -86,8 +86,13 @@ async def _discover(config: AuthClientConfig, http: httpx2.AsyncClient) -> Provi
         metadata=metadata,
         jwt=JwtVerifier(
             issuer=config.issuer,
-            jwks=RemoteJwks(metadata.jwks_uri, http, config.timeout_seconds),
-            algorithms=algorithms,
+            jwks=RemoteJwks(
+                metadata.jwks_uri,
+                http,
+                config.timeout_seconds,
+                algorithms=[algorithms[0]],
+            ),
+            algorithms=[algorithms[0]],
             clock_tolerance_seconds=config.clock_tolerance_seconds,
         ),
     )

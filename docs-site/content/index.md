@@ -4,7 +4,7 @@ seo:
   description: Python SDK for applications relying on a CIRCLE auth-service identity provider. Async backend-for-frontend OIDC sign-in, entitlements from claims, back-channel logout, bearer token verification, credit wallet, LiteLLM gateway client, billing and consumption.
 ---
 
-:::u-page-hero
+:::u-page-hero{.circle-hero}
 #title
 CIRCLE auth-ai (Python)
 
@@ -25,7 +25,7 @@ GitHub
 ::::
 :::
 
-:::u-page-section
+:::u-page-section{.circle-section}
 #title
 What it does
 

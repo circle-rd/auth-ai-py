@@ -114,6 +114,25 @@ class TestStartLogin:
 
 
 class TestDiscovery:
+    async def test_discovers_a_path_based_issuer_with_a_trailing_slash(self, idp: MockIdp) -> None:
+        issuer = "https://www.certification.openid.net/test/a/rp-py-basic/"
+        idp.metadata.update(
+            {
+                "issuer": issuer,
+                "authorization_endpoint": f"{issuer}authorize",
+                "token_endpoint": f"{issuer}token",
+                "userinfo_endpoint": f"{issuer}userinfo",
+                "jwks_uri": f"{issuer}jwks",
+            }
+        )
+        client = create_test_auth(idp, issuer=issuer)
+
+        result = await client.start_login()
+
+        assert result.url.startswith(f"{issuer}authorize?")
+        [request] = idp.requests_to("/test/a/rp-py-basic/.well-known/openid-configuration")
+        assert request.url.path == "/test/a/rp-py-basic/.well-known/openid-configuration"
+
     async def test_fails_with_oidc_001_and_retries_on_the_next_call(
         self, auth: AuthClient, idp: MockIdp
     ) -> None:
@@ -192,6 +211,24 @@ class TestHandleCallback:
         assert scheme == "Basic"
         identifier, secret = base64.b64decode(encoded).decode().split(":")
         assert (unquote(identifier), unquote(secret)) == (CLIENT_ID, CLIENT_SECRET)
+
+    async def test_refreshes_jwks_and_accepts_a_unique_key_when_id_token_omits_kid(
+        self, auth: AuthClient, idp: MockIdp
+    ) -> None:
+        first = (await auth.start_login()).handshake
+        respond_with_tokens(idp, first)
+        await auth.handle_callback(callback_url(first), first)
+        assert len(idp.requests_to("/jwks")) == 1
+
+        second = (await auth.start_login()).handshake
+        idp.token_handler = lambda _request: bearer_token_response(
+            id_token=idp.id_token(kid=None, nonce=second.nonce)
+        )
+
+        result = await auth.handle_callback(callback_url(second), second)
+
+        assert result.claims.sub == "user-1"
+        assert len(idp.requests_to("/jwks")) == 2
 
     async def test_form_urlencodes_the_credentials_before_the_basic_encoding(
         self, idp: MockIdp
@@ -332,7 +369,7 @@ class TestHandleCallback:
         respond_with_tokens(idp, handshake, roles="admin")
         await expect_error(auth.handle_callback(callback_url(handshake), handshake), "TOK_001")
 
-    async def test_rejects_a_token_response_without_expires_in(
+    async def test_uses_a_conservative_expiry_when_token_response_omits_expires_in(
         self, auth: AuthClient, idp: MockIdp
     ) -> None:
         handshake = (await auth.start_login()).handshake
@@ -340,7 +377,11 @@ class TestHandleCallback:
         idp.token_handler = lambda _request: json_response(
             {"access_token": "a", "token_type": "Bearer", "id_token": id_token}
         )
-        await expect_error(auth.handle_callback(callback_url(handshake), handshake), "OIDC_003")
+
+        result = await auth.handle_callback(callback_url(handshake), handshake)
+
+        assert result.tokens.expires_at > now_seconds()
+        assert result.tokens.expires_at <= now_seconds() + 300
 
     async def test_rejects_a_non_bearer_token_type(self, auth: AuthClient, idp: MockIdp) -> None:
         idp.token_handler = lambda _request: json_response(
@@ -628,7 +669,26 @@ class TestVerifyJwt:
         claims = await auth.verify_jwt(idp.id_token(), audience=CLIENT_ID)
         assert claims["sub"] == "user-1"
 
-    async def test_refetches_the_keys_for_an_unknown_kid_once_per_cooldown(
+    async def test_ignores_jwks_keys_on_unsupported_curves(
+        self, auth: AuthClient, idp: MockIdp
+    ) -> None:
+        idp.jwks_overrides = [
+            idp.private_key.as_dict(private=False, alg="ES256"),
+            {
+                "kty": "EC",
+                "crv": "secp256k1",
+                "kid": "unsupported-curve",
+                "use": "sig",
+                "x": "AA",
+                "y": "AA",
+            },
+        ]
+
+        claims = await auth.verify_jwt(idp.id_token(), audience=CLIENT_ID)
+
+        assert claims["sub"] == "user-1"
+
+    async def test_refetches_the_keys_for_an_unknown_kid_with_a_short_cooldown(
         self, auth: AuthClient, idp: MockIdp, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         await auth.verify_jwt(idp.id_token(), audience=CLIENT_ID)
@@ -645,13 +705,23 @@ class TestVerifyJwt:
             {**rotated.as_dict(private=False, alg="ES256"), "kid": "key-2"},
         ]
 
-        await expect_error(auth.verify_jwt(token, audience=CLIENT_ID), "TOK_001")
-        assert len(idp.requests_to("/jwks")) == 1
-
-        real = __import__("time").monotonic()
-        monkeypatch.setattr("auth_ai.jwt.time.monotonic", lambda: real + 31)
         assert (await auth.verify_jwt(token, audience=CLIENT_ID))["sub"] == "u"
         assert len(idp.requests_to("/jwks")) == 2
+
+        another = idp.generate_foreign_key()
+        token = idp.sign_jwt(
+            {"iss": ISSUER, "sub": "u", "aud": CLIENT_ID, "exp": now_seconds() + 60},
+            key=another,
+            kid="key-3",
+        )
+        idp.jwks_overrides.append({**another.as_dict(private=False, alg="ES256"), "kid": "key-3"})
+        await expect_error(auth.verify_jwt(token, audience=CLIENT_ID), "TOK_001")
+        assert len(idp.requests_to("/jwks")) == 2
+
+        real = __import__("time").monotonic()
+        monkeypatch.setattr("auth_ai.jwt.time.monotonic", lambda: real + 1.1)
+        assert (await auth.verify_jwt(token, audience=CLIENT_ID))["sub"] == "u"
+        assert len(idp.requests_to("/jwks")) == 3
 
     async def test_rejects_a_token_of_the_wrong_type(self, auth: AuthClient, idp: MockIdp) -> None:
         token = idp.sign_jwt(

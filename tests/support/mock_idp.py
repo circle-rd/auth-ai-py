@@ -49,9 +49,26 @@ def now_seconds() -> int:
     return int(time.time())
 
 
-def sign(claims: dict[str, Any], key: ECKey, *, typ: str | None = None, kid: str = "key-1") -> str:
-    header = {"alg": "ES256", "kid": kid, **({"typ": typ} if typ else {})}
-    return jwt.encode(header, claims, key, algorithms=["ES256"])
+def sign(
+    claims: dict[str, Any],
+    key: ECKey,
+    *,
+    typ: str | None = None,
+    kid: str | None = "key-1",
+    omit_typ: bool = False,
+) -> str:
+    header = {
+        "alg": "ES256",
+        **({"kid": kid} if kid is not None else {}),
+        **({"typ": typ} if typ else {}),
+    }
+    return jwt.encode(
+        header,
+        claims,
+        key,
+        algorithms=["ES256"],
+        default_type=None if omit_typ else "JWT",
+    )
 
 
 @dataclass
@@ -79,11 +96,12 @@ class MockIdp:
         *,
         typ: str | None = None,
         key: ECKey | None = None,
-        kid: str = "key-1",
+        kid: str | None = "key-1",
+        omit_typ: bool = False,
     ) -> str:
-        return sign(claims, key or self.private_key, typ=typ, kid=kid)
+        return sign(claims, key or self.private_key, typ=typ, kid=kid, omit_typ=omit_typ)
 
-    def id_token(self, **claims: Any) -> str:
+    def id_token(self, *, kid: str | None = "key-1", **claims: Any) -> str:
         now = now_seconds()
         return self.sign_jwt(
             {
@@ -93,7 +111,8 @@ class MockIdp:
                 "iat": now,
                 "exp": now + 300,
                 **claims,
-            }
+            },
+            kid=kid,
         )
 
     @staticmethod
@@ -117,7 +136,7 @@ class MockIdp:
         self.requests.append(recorded)
 
         match request.url.path:
-            case "/.well-known/openid-configuration":
+            case path if path.endswith("/.well-known/openid-configuration"):
                 if self.discovery_failures > 0:
                     self.discovery_failures -= 1
                     return httpx2.Response(503, text="unavailable")

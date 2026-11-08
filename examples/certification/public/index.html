@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#0b1220" />
+    <title>CIRCLE · Référence OIDC</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <div class="backdrop" aria-hidden="true"></div>
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="CIRCLE">
+        <span class="brand-mark">C</span>
+        <span>CIRCLE</span>
+      </a>
+      <span class="env">Reference RP · Python</span>
+    </header>
+
+    <main class="stage">
+      <section id="landing" class="card landing" aria-labelledby="landing-title">
+        <p class="eyebrow">OpenID Connect</p>
+        <h1 id="landing-title">Les Alpes, en toute confiance.</h1>
+        <p class="lede">
+          Connectez-vous avec votre compte CIRCLE pour ouvrir une session
+          fédérée et voir les informations que le fournisseur d’identité
+          partage avec cette application.
+        </p>
+        <button id="login" class="button primary" type="button">
+          Se connecter avec CIRCLE
+        </button>
+        <p class="fineprint">Reference relying party · auth-ai-py</p>
+      </section>
+
+      <section id="account" class="card account" aria-labelledby="account-title" hidden>
+        <div class="identity">
+          <div id="avatar" class="avatar" aria-hidden="true"></div>
+          <div class="identity-copy">
+            <p class="eyebrow">Session active</p>
+            <h1 id="account-title">—</h1>
+            <p id="user-email" class="muted">—</p>
+            <div id="user-badges" class="badges"></div>
+          </div>
+        </div>
+
+        <dl class="details">
+          <div>
+            <dt>Subject</dt>
+            <dd id="user-sub">—</dd>
+          </div>
+          <div>
+            <dt>Plan</dt>
+            <dd id="user-plan">—</dd>
+          </div>
+          <div>
+            <dt>Rôles</dt>
+            <dd id="user-roles">—</dd>
+          </div>
+          <div>
+            <dt>Expire</dt>
+            <dd id="user-expiry">—</dd>
+          </div>
+        </dl>
+
+        <div class="account-actions">
+          <button id="logout" class="button secondary" type="button">
+            Se déconnecter
+          </button>
+          <p class="fineprint">Session renouvelée automatiquement par le SDK.</p>
+        </div>
+      </section>
+
+      <p id="error" class="alert" role="alert" hidden></p>
+    </main>
+
+    <footer class="footer">
+      <span>Photo : Unsplash · Alpes</span>
+      <span>OpenID Connect reference implementation</span>
+    </footer>
+
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>
