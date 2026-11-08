@@ -66,8 +66,8 @@ handlers = AuthHandlers(
     grants=grants,
     sessions=MemorySessionStore(),
     secret=config.cookie_secret.get_secret_value(),
-    require_provider_session=False,
-    allow_missing_logout_token_typ=True,
+    require_provider_session=not config.oidf_mock_compat,
+    allow_missing_logout_token_typ=config.oidf_mock_compat,
     on_error=_log_handler_error,
     on_sessions_ended=_log_sessions_ended,
 )

@@ -42,6 +42,9 @@ class Config(BaseModel):
     auth_client_id: str = Field(min_length=1, alias="AUTH_CLIENT_ID")
     auth_client_secret: SecretStr = Field(min_length=1, alias="AUTH_CLIENT_SECRET")
     cookie_secret: SecretStr = Field(min_length=MIN_COOKIE_SECRET_LENGTH, alias="COOKIE_SECRET")
+    # Only for the OpenID Foundation mock OP: accepts the sid-less ID tokens and the
+    # logout tokens without `typ` that its plans issue. Never enable against auth-service.
+    oidf_mock_compat: bool = Field(default=False, alias="OIDF_MOCK_COMPAT")
 
 
 def load_config(env: Mapping[str, str]) -> Config:

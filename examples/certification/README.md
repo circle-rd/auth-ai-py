@@ -12,6 +12,7 @@ logout.
 - `AUTH_CLIENT_ID` / `AUTH_CLIENT_SECRET` — the registered static client
 - `COOKIE_SECRET` — at least 32 characters
 - `PORT` — defaults to `3000`
+- `OIDF_MOCK_COMPAT` — defaults to `false`, see below
 
 Register these URIs on the auth-service application:
 
@@ -22,7 +23,6 @@ Register these URIs on the auth-service application:
 The client must use `client_secret_basic`, PKCE, and the scopes
 `openid profile email roles permissions features offline_access`.
 
-The OIDF mock OP currently omits the required `typ=logout+jwt` header from its
-back-channel logout tokens. This reference app opts into accepting a missing `typ`
-only for that conformance mismatch; the SDK default remains strict and rejects
-missing or incorrect values.
+`OIDF_MOCK_COMPAT` — leave unset (`false`) against auth-service. Set to `true` only for
+the OpenID Foundation mock OP: it accepts ID tokens without `sid` and back-channel logout
+tokens without `typ=logout+jwt`, which that mock omits. Never enable it in production.
