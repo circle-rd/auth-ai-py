@@ -1,4 +1,9 @@
 export default defineAppConfig({
+  ui: {
+    colors: {
+      primary: "neutral",
+    },
+  },
   seo: {
     title: "CIRCLE auth-ai (Python)",
     description:
