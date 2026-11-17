@@ -303,7 +303,9 @@ class TestMcpEndpoints:
         assert client.mcp_url() == f"{GATEWAY_URL}/mcp"
         assert client.mcp_url("docs-server_1") == f"{GATEWAY_URL}/docs-server_1/mcp"
 
-    @pytest.mark.parametrize("name", ["", "a/b", "..", "a b", "x?y=1", "x#y", "-start"])
+    @pytest.mark.parametrize(
+        "name", ["", "a/b", "..", "a b", "x?y=1", "x#y", "-start", "v1", "V1", "a\n"]
+    )
     def test_refuses_the_server_name(self, client: GatewayClient, name: str) -> None:
         with pytest.raises(AuthAiError) as caught:
             client.mcp_url(name)

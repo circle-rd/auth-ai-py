@@ -14,6 +14,8 @@ if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Mapping
 
 _SERVER_NAME_PATTERN: Final = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}")
+# The gateway's own `/v1/mcp/...` routes own this segment: no server can be named so.
+_RESERVED_SERVER_NAME: Final = "v1"
 
 
 class _GatewayModelBase(BaseModel):
@@ -133,15 +135,15 @@ class GatewayClient:
         return await self._tokens.get_token()
 
     async def list_models(self) -> list[GatewayModel]:
-        """The models the user's plan may call."""
+        """The models the user may call: the ones they own or that are shared with them."""
         return (await self._get_json("/v1/models", TypeAdapter(_ModelList))).data
 
     async def list_agents(self) -> list[GatewayAgent]:
-        """The agents the user's plan may reach."""
+        """The agents the user may reach."""
         return await self._get_json("/v1/agents", TypeAdapter(list[GatewayAgent]))
 
     async def list_mcp_servers(self) -> list[GatewayMcpServer]:
-        """The MCP servers the user's plan may reach."""
+        """The MCP servers the user may reach."""
         return await self._get_json("/v1/mcp/server", TypeAdapter(list[GatewayMcpServer]))
 
     def mcp_url(self, server_name: str | None = None) -> str:
@@ -152,7 +154,10 @@ class GatewayClient:
         """
         if server_name is None:
             return f"{self._gateway_url}/mcp"
-        if not _SERVER_NAME_PATTERN.fullmatch(server_name):
+        if (
+            not _SERVER_NAME_PATTERN.fullmatch(server_name)
+            or server_name.lower() == _RESERVED_SERVER_NAME
+        ):
             raise ERR.CFG_001("Invalid MCP server name")
         return f"{self._gateway_url}/{server_name}/mcp"
 

@@ -32,8 +32,19 @@ from .protected_resource import (
     protected_resource_metadata,
     protected_resource_metadata_path,
 )
+from .resources import (
+    AccessibleResource,
+    Allowed,
+    AuthorizeDecision,
+    Denied,
+    ResourcesApi,
+    ResourceState,
+)
 
 __all__ = [
+    "AccessibleResource",
+    "Allowed",
+    "AuthorizeDecision",
     "BackchannelLogoutEvent",
     "BackchannelLogoutHandler",
     "BearerVerifier",
@@ -41,12 +52,15 @@ __all__ = [
     "ConsumptionAggregate",
     "ConsumptionApi",
     "ConsumptionResult",
+    "Denied",
     "InvoicePage",
     "InvoiceView",
     "LogoutTokenClaims",
     "MachineApi",
     "MemoryReplayStore",
     "ReplayStore",
+    "ResourceState",
+    "ResourcesApi",
     "SubscriptionView",
     "UsageView",
     "VerifiedAccessToken",

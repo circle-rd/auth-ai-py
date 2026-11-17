@@ -32,7 +32,7 @@ Modules (the import paths that exist):
 - Confidential application, redirect URI `<origin><base_path>/callback` (`base_path` defaults to `/auth`).
 - Back-channel logout URI `<origin><base_path>/backchannel-logout` (HTTPS, reachable by auth-service) and/or end-session enabled: sign-in refuses an ID token without `sid`.
 - **LiteLLM support** on when `gateway_url` is set.
-- Machine scopes `billing:read`, `consumption:read`, `consumption:write` for the machine API (default for new confidential apps; a superadmin must set them on older apps).
+- Machine scopes `billing:read`, `consumption:read`, `consumption:write`, `resources:validate` for the machine API (default for new confidential apps; a superadmin must set them on older apps). `resources:authorize` is never a default: a superadmin grants it to a trusted enforcement point only.
 
 ## Minimal FastAPI backend
 
@@ -89,6 +89,7 @@ Close the client at shutdown with `await auth.aclose()` (or `async with AuthClie
 - **Entitlements**: `has_role(claims, "admin")`, `has_permission(claims, "reports", "write")` (write implies read), `has_feature(claims, "beta")`, `get_feature(claims, "seats")`. Enforce on the server.
 - **Wallet and gateway** (needs `gateway_url`): `user = AiClient(auth=auth, grants=grants).for_user(sub)`; `await user.wallet.get_account()` (amounts are `int` micro-euros: use `format_euros(balance)`; decide with `can_spend`); `await user.gateway.post_json("/v1/chat/completions", {"model": ..., "messages": [...], "metadata": {"session_id": ...}})`; OpenAI-compatible SDK: `AsyncOpenAI(base_url=gateway.openai_base_url, api_key="unused", http_client=gateway.create_http_client())` (you close the http client). `402` is `GW_001` (`is_insufficient_credit`), `429` is `GW_002`.
 - **Billing and consumption** (backend only, needs `client_secret`): `machine = MachineApi(auth)`; `await machine.billing.get_subscription(sub)`, `.get_usage(sub)`, `.list_invoices(sub, limit=50, cursor=None)`; `await machine.consumption.report(sub, "exports", 1, idempotency_key="...")`, `.list_aggregates(sub)`, `.get_aggregate(sub, key)`.
+- **Resource sharing** (backend only, needs `client_secret` and an auth-service with `RESOURCE_SHARING_ENABLED`): `await machine.resources.authorize(subject_id=..., client_id=..., resource_uri=..., audience=...)` returns `Allowed` or `Denied` (take the three ids from a verified token; only `Allowed` admits, and a raised error is a denial), `.list_accessible(subject_id, scheme=None)`, `.validate(resource_id, result=..., reason=None, evidence=None)` and `.invalidate(resource_id, reason)` for the validator of a resource scheme.
 - **Protect an API**: `BearerVerifier(auth, audience="https://api.example.com")`, then `token = await verifier.verify_header(request.headers.get("authorization"))` and `require_scopes(token, "roles")`; serve `protected_resource_metadata(auth, resource=...)` at `protected_resource_metadata_path(resource)` and answer 401/403 with `bearer_challenge(metadata_url, error=...)`.
 - **Frontend**: not in this package. Use `createBrowserAuth()` and the React/Vue bindings of `@circle-rd/auth-ai`; the browser only holds an opaque session cookie.
 

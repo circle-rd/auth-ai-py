@@ -102,6 +102,13 @@ async def models(session: Session = Depends(require_auth(handlers))):
   subscription, metered usage and invoices; usage reporting with idempotency
   keys for features billed per call.
 
+**Resource sharing**
+
+- Machine client for adapter services and scheme owners: ask auth-service
+  whether a user may use a shared resource (`authorize`, fail closed), list what
+  they can reach, and report the validation or loss of ownership of a resource
+  (`validate`, `invalidate`).
+
 **Delivery**
 
 - Framework-agnostic `WebRequest` → `WebResponse` handlers (mount them
