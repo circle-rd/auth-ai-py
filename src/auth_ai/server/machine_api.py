@@ -7,6 +7,7 @@ from ..http import JsonHttp
 from .billing import BillingApi
 from .consumption import ConsumptionApi
 from .machine_tokens import ClientCredentialsAuth, MachineTokenProvider
+from .resources import ResourcesApi
 
 if TYPE_CHECKING:
     import httpx2
@@ -26,8 +27,9 @@ class MachineApi:
     """The auth-service REST API as the application's backend.
 
     Every call carries a `client_credentials` token minted from the application's
-    own secret. The scopes `billing:read`, `consumption:read` and
-    `consumption:write` must be granted to the application by a superadmin.
+    own secret. The scopes `billing:read`, `consumption:read`, `consumption:write`
+    and `resources:validate` are granted to new confidential applications; older
+    applications, and the platform scope `resources:authorize`, need a superadmin.
     """
 
     def __init__(self, auth: MachineAuth) -> None:
@@ -41,3 +43,4 @@ class MachineApi:
         )
         self.billing = BillingApi(http)
         self.consumption = ConsumptionApi(http)
+        self.resources = ResourcesApi(http)

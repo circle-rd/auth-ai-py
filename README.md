@@ -29,7 +29,8 @@ refresh, logout or billing plumbing yourself.
 
 This is the Python port of [`@circle-rd/auth-ai`](https://github.com/circle-rd/auth-ai-ts):
 same behaviours, same wire contract, same error codes. A Python backend can serve
-the TypeScript browser client and the React and Vue bindings unchanged.
+the TypeScript browser client and the React and Vue bindings unchanged. A Rust SDK,
+[`auth-ai`](https://github.com/circle-rd/auth-ai-rs), follows the same contract.
 
 Full documentation: **https://docs.circle-cyber.com/auth-ai/python/**
 
@@ -101,6 +102,14 @@ async def models(session: Session = Depends(require_auth(handlers))):
 - Machine client (`client_credentials`, cached and single-flighted): a user's
   subscription, metered usage and invoices; usage reporting with idempotency
   keys for features billed per call.
+
+**Resource sharing**
+
+- Machine client for adapter services and scheme owners: ask auth-service
+  whether a user may use a shared resource (`authorize`, fail closed), list what
+  they can reach, and report the validation or loss of ownership of a resource
+  (`validate`, `invalidate`); report what a provider billed for a shared resource
+  (`record_usage`, idempotent).
 
 **Delivery**
 

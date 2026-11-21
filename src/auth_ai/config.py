@@ -31,6 +31,9 @@ DEFAULT_SCOPES: Final = (
 # Scope that lets a user token read the user's own wallet.
 WALLET_SELF_SCOPE: Final = "wallet:self:read"
 
+# Scope that lets an application act for a user on their own shared resources.
+RESOURCE_SELF_SCOPE: Final = "resources:self:manage"
+
 _LOOPBACK_HOSTS: Final = frozenset({"localhost", "127.0.0.1", "::1"})
 
 
@@ -112,6 +115,8 @@ class AuthClientConfig(BaseModel):
     resources: tuple[_Url, ...] = ()
     # Public URL of the LiteLLM gateway: turns on the gateway and wallet audiences.
     gateway_url: _GatewayUrl | None = None
+    # Ask for the resource-sharing scope and the auth-service audience at sign-in.
+    resource_sharing: bool = False
     clock_tolerance_seconds: Annotated[int, Field(ge=0, le=300)] = 5
     timeout_seconds: Annotated[float, Field(gt=0)] = 10.0
 
@@ -128,15 +133,17 @@ class AuthClientConfig(BaseModel):
                 for issue in err.errors(include_input=False, include_url=False)
             )
             raise ERR.CFG_001(f"Invalid SDK configuration: {issues}", cause=err) from err
-        if config.gateway_url is None:
-            return config
-        # Mutated in place: a validator that returns another instance breaks `__init__`.
-        object.__setattr__(
-            config, "scopes", tuple(dict.fromkeys([*config.scopes, WALLET_SELF_SCOPE]))
-        )
-        object.__setattr__(
-            config,
-            "resources",
-            tuple(dict.fromkeys([*config.resources, config.gateway_url, config.issuer])),
-        )
+        scopes = list(config.scopes)
+        resources = list(config.resources)
+        if config.gateway_url is not None:
+            scopes.append(WALLET_SELF_SCOPE)
+            resources.extend([config.gateway_url, config.issuer])
+        if config.resource_sharing:
+            scopes.append(RESOURCE_SELF_SCOPE)
+            resources.append(config.issuer)
+        if scopes != list(config.scopes):
+            # Mutated in place: a validator that returns another instance breaks `__init__`.
+            object.__setattr__(config, "scopes", tuple(dict.fromkeys(scopes)))
+        if resources != list(config.resources):
+            object.__setattr__(config, "resources", tuple(dict.fromkeys(resources)))
         return config

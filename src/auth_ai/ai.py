@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Protocol
 from .errors import ERR
 from .gateway import GatewayClient
 from .http import JsonHttp
+from .sharing import ResourceSharingClient
 from .wallet import WalletClient
 
 if TYPE_CHECKING:
@@ -50,20 +51,19 @@ class _AudienceTokens:
 
 
 class UserAi:
-    """What an application does for one signed-in user: read the wallet, call the gateway."""
+    """What an application does for one signed-in user: wallet, resources, gateway."""
 
     def __init__(self, auth: AiAuth, grants: AiGrants, grant_id: str) -> None:
         self._auth = auth
         config = auth.config
-        self.wallet = WalletClient(
-            JsonHttp(
-                base_url=config.issuer,
-                http=auth.http,
-                timeout_seconds=config.timeout_seconds,
-                tokens=_AudienceTokens(grants, grant_id, config.issuer),
-            ),
-            config.issuer,
+        issuer_http = JsonHttp(
+            base_url=config.issuer,
+            http=auth.http,
+            timeout_seconds=config.timeout_seconds,
+            tokens=_AudienceTokens(grants, grant_id, config.issuer),
         )
+        self.wallet = WalletClient(issuer_http, config.issuer)
+        self.resources = ResourceSharingClient(issuer_http)
         self._gateway_tokens = (
             _AudienceTokens(grants, grant_id, config.gateway_url) if config.gateway_url else None
         )

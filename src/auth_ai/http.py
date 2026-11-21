@@ -31,6 +31,9 @@ class HttpTokens(Protocol):
         ...
 
 
+type HttpMethod = Literal["GET", "POST", "PUT", "PATCH", "DELETE"]
+
+
 class JsonHttp:
     """Authenticated JSON calls to the auth-service REST API."""
 
@@ -49,7 +52,7 @@ class JsonHttp:
 
     async def request[M: BaseModel](
         self,
-        method: Literal["GET", "POST"],
+        method: HttpMethod,
         path: str,
         *,
         scope: str,
@@ -73,6 +76,23 @@ class JsonHttp:
             return schema.model_validate(response.json())
         except (ValueError, ValidationError) as err:
             raise ERR.API_002(cause=err) from err
+
+    async def request_empty(
+        self,
+        method: HttpMethod,
+        path: str,
+        *,
+        scope: str,
+        query: Mapping[str, str | int | None] | None = None,
+        body: Mapping[str, Any] | None = None,
+    ) -> None:
+        """Same authentication and retry path as `request`, for a 204 answer."""
+        response = await self._send(method, path, scope, query, body)
+        if response.status_code == httpx2.codes.UNAUTHORIZED:
+            self._tokens.invalidate(scope)
+            response = await self._send(method, path, scope, query, body)
+        if not response.is_success:
+            raise _to_error(response)
 
     async def _send(
         self,

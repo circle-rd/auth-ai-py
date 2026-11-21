@@ -16,7 +16,12 @@ from .claims import (
     has_role,
 )
 from .client import AuthClient
-from .config import DEFAULT_SCOPES, WALLET_SELF_SCOPE, AuthClientConfig
+from .config import (
+    DEFAULT_SCOPES,
+    RESOURCE_SELF_SCOPE,
+    WALLET_SELF_SCOPE,
+    AuthClientConfig,
+)
 from .errors import (
     ERR,
     AuthAiError,
@@ -46,6 +51,19 @@ from .grants import (
 )
 from .introspection import IntrospectionResult
 from .session_user import SessionUser, to_session_user
+from .sharing import (
+    AccessibleResource,
+    Audience,
+    Catalogue,
+    CatalogueApplication,
+    DeletedResource,
+    Grant,
+    MemberApplication,
+    Organization,
+    Resource,
+    ResourceSharingClient,
+    ValidationRequest,
+)
 from .transport import build_http_client
 from .types import (
     LoginHandshake,
@@ -77,21 +95,28 @@ __all__ = [
     "DEFAULT_SCOPES",
     "ERR",
     "MICRO_PER_EUR",
+    "RESOURCE_SELF_SCOPE",
     "WALLET_SELF_SCOPE",
     "AccessToken",
     "AccessTokenClaims",
+    "AccessibleResource",
     "AiClient",
+    "Audience",
     "AuthAiError",
     "AuthAiErrorCode",
     "AuthAiErrorDetails",
     "AuthClient",
     "AuthClientConfig",
+    "Catalogue",
+    "CatalogueApplication",
+    "DeletedResource",
     "FeatureValue",
     "GatewayAgent",
     "GatewayAuth",
     "GatewayClient",
     "GatewayMcpServer",
     "GatewayModel",
+    "Grant",
     "GrantLock",
     "GrantManager",
     "GrantStore",
@@ -101,14 +126,19 @@ __all__ = [
     "LoginHandshake",
     "LoginRequest",
     "LoginResult",
+    "MemberApplication",
     "MemoryGrantStore",
+    "Organization",
     "Prompt",
+    "Resource",
+    "ResourceSharingClient",
     "SessionUser",
     "TokenSet",
     "TokenTypeHint",
     "TopupOptions",
     "UserAi",
     "UserInfoClaims",
+    "ValidationRequest",
     "WalletAccount",
     "WalletClient",
     "WalletSessionUsage",

@@ -14,6 +14,49 @@ Sections, when present, appear in this order: `Added`, `Changed`, `Removed`,
 
 <!-- Add user-visible changes here. Move to a dated section at release time. -->
 
+## [0.4.0] - 2026-11-21
+
+Aligns the SDK with auth-service resource sharing (generic resource registry, grants,
+validation, self-service sharing, webhooks, LiteLLM entitlements). The new calls need an
+auth-service with `RESOURCE_SHARING_ENABLED`.
+
+### Added
+
+- **`user.resources`** (`auth_ai.ResourceSharingClient`): the signed-in user shares their own
+  resources. `list_member_applications`, `list_organizations`, `list_owned`, `get`, `create`,
+  `update`, `delete`, `request_validation`, `list_grants`, `create_grant`, `revoke_grant`,
+  `list_accessible` and `get_catalogue`. Set `AuthClientConfig(resource_sharing=True)` to ask
+  for the `resources:self:manage` scope and the auth-service audience at sign-in. A user grant
+  accepts an e-mail (`subject_email`) resolved by auth-service among active members; an
+  organisation grant requires the owner to belong to it. Inputs are validated before any
+  request (`CFG_001`).
+- **`verify_resource_event`** (`auth_ai.server`): verifies and parses the signed
+  `X-Auth-Service-Signature` callback auth-service sends to an application's
+  `resourceWebhookUrl` (`resource.grant.created`, `resource.grant.revoked`). The timestamp is
+  bounded and the payload is typed (`ResourceEvent`, recipients and grant models).
+- **`machine.resources.record_usage`** reports the usage a provider billed for a shared
+  resource to auth-service (`POST /api/internal/gateway/usage`, scope
+  `resources:usage:write`, granted to the platform's metering components only). It returns a
+  `UsageReceipt` (`usage`, `replayed`): replaying an event is idempotent, a payload that
+  conflicts with the stored event is refused (`RES_012`), and so is a caller with no access to
+  the resource (`RES_011`).
+- **`machine.resources`** (`auth_ai.server`, class `ResourcesApi`): `authorize` asks whether a
+  user may use a resource (`resources:authorize`) and returns `Denied` or `Allowed`;
+  `list_accessible` lists the validated resources a user may use; `validate` and `invalidate`
+  let the validator bound to a resource scheme report the outcome of an ownership check or its
+  loss (`resources:validate`).
+- Guide [Resource sharing](docs-site/content/docs/3.guides/3.ai-and-billing/3.resource-sharing.md).
+
+### Changed
+
+- **`JsonHttp` supports `PUT`, `PATCH` and `DELETE`**, plus `request_empty` for a `204`
+  answer. Existing methods are unchanged.
+- **`GatewayClient.mcp_url(name)` refuses the name `v1`** (any case) with `CFG_001`.
+- Gateway access is now decided by auth-service entitlements (ownership, grants, application
+  membership) instead of plan teams and access groups.
+- The machine scope defaults documented for a new confidential application now include
+  `resources:validate`; `resources:authorize` is never a default.
+
 ## [0.3.0] - 2026-11-07
 
 ### Added

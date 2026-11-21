@@ -20,6 +20,10 @@ Get started
 TypeScript SDK
 ::::
 
+::::u-button{to="https://docs.circle-cyber.com/auth-ai/rust/" size="xl" variant="outline" color="neutral" icon="i-simple-icons-rust"}
+Rust SDK
+::::
+
 ::::u-button{to="https://github.com/circle-rd/auth-ai-py" target="_blank" size="xl" variant="outline" color="neutral" icon="i-simple-icons-github"}
 GitHub
 ::::

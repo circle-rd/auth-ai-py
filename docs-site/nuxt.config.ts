@@ -56,6 +56,12 @@ export default defineNuxtConfig({
             href: "https://docs.circle-cyber.com/auth-ai/typescript/",
           },
           {
+            title: "CIRCLE auth-ai (Rust) documentation",
+            description:
+              "The Rust SDK, with the same behaviours and wire contract, for Rust backends.",
+            href: "https://docs.circle-cyber.com/auth-ai/rust/",
+          },
+          {
             title: "CIRCLE auth-service documentation",
             description:
               "The identity provider this SDK talks to: applications, claims, wallet, LiteLLM gateway.",
@@ -65,7 +71,7 @@ export default defineNuxtConfig({
       },
     ],
     notes: [
-      "This is the Python port of the TypeScript SDK @circle-rd/auth-ai (documented at https://docs.circle-cyber.com/auth-ai/typescript/). Both SDKs share the same wire contract: the backend-for-frontend routes, the sealed login cookie format, the cookie names and the error code registry.",
+      "This is the Python port of the TypeScript SDK @circle-rd/auth-ai (documented at https://docs.circle-cyber.com/auth-ai/typescript/). A Rust SDK (https://docs.circle-cyber.com/auth-ai/rust/) follows the same contract. The SDKs share the same wire contract: the backend-for-frontend routes, the sealed login cookie format, the cookie names and the error code registry.",
       "When to use CIRCLE auth-ai (Python): in an asyncio Python backend (FastAPI, Starlette, or another framework through a small adapter) that signs users in through a CIRCLE auth-service instance (OIDC authorization code with PKCE, backend-for-frontend) and, optionally, reads the user's credit wallet and calls the LiteLLM gateway on the user's behalf.",
       "CIRCLE auth-ai is built for auth-service (its claims and its wallet, billing and consumption REST routes): it is not a client for arbitrary OIDC providers, and it is not an identity provider. To run the provider, use the auth-service documentation at https://docs.circle-cyber.com/auth-service/.",
       "Tokens stay on the server: the browser only holds an opaque session cookie. The SDK has no debit API: the gateway debits the wallet after each call.",
