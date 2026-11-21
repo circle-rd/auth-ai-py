@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import httpx2
@@ -325,6 +326,133 @@ class TestInvalidate:
     ) -> None:
         with pytest.raises(AuthAiError) as raised:
             await api.resources.invalidate(resource_id, reason)
+
+        assert raised.value.code == "CFG_001"
+        assert_no_request(idp)
+
+
+EVENT_ID = "0123456789abcdef" * 4
+
+RECEIPT = {
+    "usage": {
+        "id": "u-1",
+        "resourceId": RESOURCE_ID,
+        "requestId": EVENT_ID,
+        "occurredAt": "2026-11-18T10:00:00.000Z",
+    },
+    "replayed": False,
+}
+
+
+def usage_record(**override: Any) -> dict[str, Any]:
+    record: dict[str, Any] = {
+        "subject_id": "user-1",
+        "client_id": "gateway",
+        "resource_id": RESOURCE_ID,
+        "resource_uri": "llm://acme/gpt-x",
+        "request_id": EVENT_ID,
+        "occurred_at": datetime.now(UTC),
+        "usage_source": "provider",
+        "cost_usd": "0.0042",
+        "prompt_tokens": 120,
+        "completion_tokens": 30,
+        "total_tokens": 150,
+    }
+    return {**record, **override}
+
+
+class TestRecordUsage:
+    async def test_sends_the_event_with_the_usage_scope(
+        self, idp: MockIdp, api: MachineApi
+    ) -> None:
+        idp.api_handler = lambda _request: json_response(RECEIPT, status=201)
+
+        receipt = await api.resources.record_usage(**usage_record())
+
+        assert receipt.replayed is False
+        assert receipt.usage.id == "u-1"
+        request = last_api_request(idp)
+        assert request.url.path == "/api/internal/gateway/usage"
+        assert request.json["usageSource"] == "provider"
+        assert request.json["costUsd"] == "0.0042"
+        assert request.json["promptTokens"] == 120
+        assert request.json["requestId"] == EVENT_ID
+        assert request.json["occurredAt"].endswith("Z")
+        assert idp.requests_to("/token")[0].form["scope"] == "resources:usage:write"
+
+    async def test_an_unsupported_provider_sends_explicit_nulls(
+        self, idp: MockIdp, api: MachineApi
+    ) -> None:
+        idp.api_handler = lambda _request: json_response(RECEIPT, status=201)
+
+        await api.resources.record_usage(
+            **usage_record(
+                usage_source="unsupported",
+                cost_usd=None,
+                prompt_tokens=None,
+                completion_tokens=None,
+                total_tokens=None,
+            )
+        )
+
+        body = last_api_request(idp).json
+        assert body["usageSource"] == "unsupported"
+        for member in ("costUsd", "promptTokens", "completionTokens", "totalTokens"):
+            assert body[member] is None
+
+    async def test_reports_a_replayed_event(self, idp: MockIdp, api: MachineApi) -> None:
+        idp.api_handler = lambda _request: json_response({**RECEIPT, "replayed": True})
+
+        assert (await api.resources.record_usage(**usage_record())).replayed is True
+
+    @pytest.mark.parametrize(("status", "code"), [(403, "RES_011"), (409, "RES_012")])
+    async def test_a_refusal_is_an_error(
+        self, idp: MockIdp, api: MachineApi, status: int, code: str
+    ) -> None:
+        idp.api_handler = lambda _request: json_response(
+            {"error": {"code": code, "message": "no"}}, status=status
+        )
+
+        with pytest.raises(AuthAiError) as raised:
+            await api.resources.record_usage(**usage_record())
+
+        assert raised.value.code == "API_001"
+
+    async def test_flags_an_unexpected_answer(self, idp: MockIdp, api: MachineApi) -> None:
+        idp.api_handler = lambda _request: json_response({"usage": "stored"}, status=201)
+
+        with pytest.raises(AuthAiError) as raised:
+            await api.resources.record_usage(**usage_record())
+
+        assert raised.value.code == "API_002"
+
+    @pytest.mark.parametrize(
+        "override",
+        [
+            {"subject_id": ""},
+            {"client_id": ""},
+            {"resource_id": "not-a-uuid"},
+            {"resource_uri": "x"},
+            {"request_id": "short"},
+            {"request_id": EVENT_ID.upper()},
+            {"occurred_at": datetime.now(UTC) - timedelta(days=31)},
+            {"occurred_at": datetime.now(UTC) + timedelta(minutes=10)},
+            {"occurred_at": datetime.now()},
+            {"cost_usd": None},
+            {"cost_usd": "-1"},
+            {"cost_usd": "1e3"},
+            {"cost_usd": "007"},
+            {"usage_source": "unsupported"},
+            {"usage_source": "unsupported", "cost_usd": None},
+            {"prompt_tokens": -1},
+            {"usage_source": "other"},
+        ],
+    )
+    async def test_refuses_an_invalid_record_before_any_request(
+        self, idp: MockIdp, api: MachineApi, override: dict[str, Any]
+    ) -> None:
+        with pytest.raises(AuthAiError) as raised:
+            await api.resources.record_usage(**usage_record(**override))
 
         assert raised.value.code == "CFG_001"
         assert_no_request(idp)

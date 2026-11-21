@@ -1,15 +1,18 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Annotated, Final, Literal
+from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING, Annotated, Final, Literal, Self
 from urllib.parse import quote
 
 from pydantic import (
+    AwareDatetime,
     BaseModel,
     ConfigDict,
     Field,
     RootModel,
     StringConstraints,
     ValidationError,
+    model_validator,
 )
 
 from ..errors import ERR, AuthAiError
@@ -20,8 +23,11 @@ if TYPE_CHECKING:
 
 AUTHORIZE_SCOPE: Final = "resources:authorize"
 VALIDATE_SCOPE: Final = "resources:validate"
+USAGE_SCOPE: Final = "resources:usage:write"
 _GATEWAY_PATH: Final = "/api/internal/gateway"
 _RESOURCES_PATH: Final = f"{_GATEWAY_PATH}/resources"
+_USAGE_FUTURE_TOLERANCE: Final = timedelta(minutes=5)
+_USAGE_PAST_WINDOW: Final = timedelta(days=30)
 _UUID_PATTERN: Final = (
     r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
 )
@@ -34,6 +40,7 @@ type GrantSubjectType = Literal["user", "organization", "plan", "everyone"]
 type ResourceStatus = Literal["pending_validation", "validation_failed", "validated", "disabled"]
 type EventSource = Literal["gateway", "ssh", "external", "api"]
 type ValidationResult = Literal["validated", "validation_failed"]
+type UsageSource = Literal["provider", "unsupported"]
 
 
 class _AuthorizeInput(BaseModel):
@@ -68,6 +75,35 @@ class _InvalidationInput(BaseModel):
 
     resource_id: ResourceId
     reason: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)]
+
+
+class _UsageInput(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    subject_id: Annotated[str, Field(min_length=1, max_length=256)]
+    client_id: Annotated[str, Field(min_length=1, max_length=256)]
+    resource_id: ResourceId
+    resource_uri: Annotated[str, Field(min_length=3, max_length=512)]
+    request_id: Annotated[str, Field(pattern=r"^[a-f0-9]{64}$")]
+    occurred_at: AwareDatetime
+    usage_source: UsageSource
+    cost_usd: Annotated[str, Field(pattern=r"^(0|[1-9][0-9]{0,17})(\.[0-9]{1,18})?$")] | None = None
+    prompt_tokens: Annotated[int, Field(ge=0)] | None = None
+    completion_tokens: Annotated[int, Field(ge=0)] | None = None
+    total_tokens: Annotated[int, Field(ge=0)] | None = None
+
+    @model_validator(mode="after")
+    def _check_accounting(self) -> Self:
+        now = datetime.now(UTC)
+        if not now - _USAGE_PAST_WINDOW <= self.occurred_at <= now + _USAGE_FUTURE_TOLERANCE:
+            raise ValueError("occurred_at is outside the accepted accounting window")
+        tokens = (self.prompt_tokens, self.completion_tokens, self.total_tokens)
+        if self.usage_source == "unsupported":
+            if self.cost_usd is not None or any(t is not None for t in tokens):
+                raise ValueError("unsupported usage must not carry cost or tokens")
+        elif self.cost_usd is None:
+            raise ValueError("provider usage requires a reported cost")
+        return self
 
 
 class Denied(ApiModel):
@@ -125,6 +161,19 @@ class ResourceState(ApiModel):
 
 class _ResourceResponse(ApiModel):
     resource: ResourceState
+
+
+class RecordedUsage(ApiModel):
+    id: str
+    resource_id: str
+    request_id: str
+    occurred_at: str
+
+
+class UsageReceipt(ApiModel):
+    usage: RecordedUsage
+    #: `True` when the event had already been recorded.
+    replayed: bool
 
 
 def _invalid(what: str, err: ValidationError) -> AuthAiError:
@@ -269,3 +318,65 @@ class ResourcesApi:
             schema=_ResourceResponse,
         )
         return response.resource
+
+    async def record_usage(
+        self,
+        *,
+        subject_id: str,
+        client_id: str,
+        resource_id: str,
+        resource_uri: str,
+        request_id: str,
+        occurred_at: datetime,
+        usage_source: UsageSource,
+        cost_usd: str | None = None,
+        prompt_tokens: int | None = None,
+        completion_tokens: int | None = None,
+        total_tokens: int | None = None,
+    ) -> UsageReceipt:
+        """Records the usage a provider billed for a shared resource. Needs `resources:usage:write`.
+
+        auth-service owns accounting; this is the only write, and the scope is granted
+        to the platform's metering components, never by default. `request_id` is the
+        event's trusted identifier (64 lowercase hex characters): replaying an event is
+        safe and answers `replayed=True`. `occurred_at` is timezone-aware, at most five
+        minutes ahead and 30 days back. `cost_usd` is a plain decimal string, required
+        for `provider` usage; `unsupported` carries no cost and no tokens. A payload
+        that conflicts with the stored event is refused (`RES_012`), and so is a caller
+        with no access to the resource (`RES_011`).
+        """
+        try:
+            usage = _UsageInput(
+                subject_id=subject_id,
+                client_id=client_id,
+                resource_id=resource_id,
+                resource_uri=resource_uri,
+                request_id=request_id,
+                occurred_at=occurred_at,
+                usage_source=usage_source,
+                cost_usd=cost_usd,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                total_tokens=total_tokens,
+            )
+        except ValidationError as err:
+            raise _invalid("usage record", err) from err
+        return await self._http.request(
+            "POST",
+            f"{_GATEWAY_PATH}/usage",
+            scope=USAGE_SCOPE,
+            body={
+                "subjectId": usage.subject_id,
+                "clientId": usage.client_id,
+                "resourceId": usage.resource_id,
+                "resourceUri": usage.resource_uri,
+                "requestId": usage.request_id,
+                "occurredAt": usage.occurred_at.astimezone(UTC).isoformat().replace("+00:00", "Z"),
+                "usageSource": usage.usage_source,
+                "costUsd": usage.cost_usd,
+                "promptTokens": usage.prompt_tokens,
+                "completionTokens": usage.completion_tokens,
+                "totalTokens": usage.total_tokens,
+            },
+            schema=UsageReceipt,
+        )

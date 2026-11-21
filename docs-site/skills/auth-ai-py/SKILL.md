@@ -5,7 +5,7 @@ description: "Use when: integrating, configuring or troubleshooting auth-ai (PyP
 
 # CIRCLE auth-ai (Python)
 
-Python SDK (`auth-ai` on PyPI, imported as `auth_ai`, MIT, Python >= 3.12, async only) for applications that rely on a CIRCLE auth-service identity provider. It is the Python port of the TypeScript SDK `@circle-rd/auth-ai` (documented at https://docs.circle-cyber.com/auth-ai/typescript/) and shares its wire contract: the BFF routes, the sealed login cookie, the cookie names and the error codes.
+Python SDK (`auth-ai` on PyPI, imported as `auth_ai`, MIT, Python >= 3.12, async only) for applications that rely on a CIRCLE auth-service identity provider. It is the Python port of the TypeScript SDK `@circle-rd/auth-ai` (documented at https://docs.circle-cyber.com/auth-ai/typescript/) and shares its wire contract: the BFF routes, the sealed login cookie, the cookie names and the error codes. A Rust SDK (`auth-ai` on crates.io, https://docs.circle-cyber.com/auth-ai/rust/) shares the same contract.
 
 Full documentation: https://docs.circle-cyber.com/auth-ai/python/ . Every page is also served as markdown under `/raw/`, for example https://docs.circle-cyber.com/auth-ai/python/raw/docs/concepts/architecture.md ; the whole text is at https://docs.circle-cyber.com/auth-ai/python/llms-full.txt and a page index at https://docs.circle-cyber.com/auth-ai/python/llms.txt . The documentation also exposes an MCP server at https://docs.circle-cyber.com/auth-ai/python/mcp . Version 0.x: the API is not stable.
 
