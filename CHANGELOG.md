@@ -14,6 +14,12 @@ Sections, when present, appear in this order: `Added`, `Changed`, `Removed`,
 
 <!-- Add user-visible changes here. Move to a dated section at release time. -->
 
+### Fixed
+
+- Documentation: the back-channel logout endpoint answers `200`, not `204`, when the
+  logout token is accepted. The core API reference now lists `UserAi.resources` and the
+  `resource_sharing` configuration option that enables it.
+
 ## [0.4.0] - 2026-11-21
 
 Aligns the SDK with auth-service resource sharing (generic resource registry, grants,
