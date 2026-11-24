@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, Literal, Protocol
 
 import httpx2
@@ -132,6 +133,11 @@ def _to_error(response: httpx2.Response) -> AuthAiError:
         f"auth-service answered {status} {code}: {message}",
         details={"status": status, "apiCode": code},
     )
+
+
+def to_wire_datetime(value: datetime) -> str:
+    """A timezone-aware datetime as the UTC ISO-8601 string auth-service expects."""
+    return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
 
 
 class ApiModel(BaseModel):
