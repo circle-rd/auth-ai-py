@@ -16,7 +16,14 @@ from pydantic import (
 )
 
 from ..errors import ERR, AuthAiError
-from ..http import ApiModel
+from ..http import ApiModel, to_wire_datetime
+from ..resource_types import (
+    AccessibleResource,
+    AccessKind,
+    OwnerType,
+    ResourcePermission,
+    ResourceStatus,
+)
 
 if TYPE_CHECKING:
     from ..http import JsonHttp
@@ -34,10 +41,6 @@ _UUID_PATTERN: Final = (
 
 type ResourceId = Annotated[str, Field(pattern=_UUID_PATTERN)]
 
-type OwnerType = Literal["user", "application"]
-type AccessKind = Literal["owner", "grant"]
-type GrantSubjectType = Literal["user", "organization", "plan", "everyone"]
-type ResourceStatus = Literal["pending_validation", "validation_failed", "validated", "disabled"]
 type EventSource = Literal["gateway", "ssh", "external", "api"]
 type ValidationResult = Literal["validated", "validation_failed"]
 type UsageSource = Literal["provider", "unsupported"]
@@ -47,9 +50,10 @@ class _AuthorizeInput(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     subject_id: Annotated[str, Field(min_length=1, max_length=256)]
-    client_id: Annotated[str, Field(min_length=1, max_length=256)]
+    actor_client_id: Annotated[str, Field(min_length=1, max_length=256)] | None = None
     resource_uri: Annotated[str, Field(min_length=3, max_length=512)]
     audience: Annotated[str, Field(min_length=1, max_length=2048)]
+    permission: ResourcePermission | None = None
     request_id: Annotated[str, Field(min_length=1, max_length=256)] | None = None
     source: EventSource | None = None
 
@@ -80,8 +84,8 @@ class _InvalidationInput(BaseModel):
 class _UsageInput(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
-    subject_id: Annotated[str, Field(min_length=1, max_length=256)]
-    client_id: Annotated[str, Field(min_length=1, max_length=256)]
+    decision_id: Annotated[str, Field(min_length=1, max_length=2048)]
+    started_at: AwareDatetime
     resource_id: ResourceId
     resource_uri: Annotated[str, Field(min_length=3, max_length=512)]
     request_id: Annotated[str, Field(pattern=r"^[a-f0-9]{64}$")]
@@ -116,12 +120,18 @@ class Allowed(ApiModel):
     """The user may use the resource."""
 
     decision: Literal["allow"]
+    #: Hand it to `record_usage`: it names the person and the application.
+    decision_id: str
+    expires_at: datetime
     resource_id: str
     resource_uri: str
     application_slug: str
     owner_type: OwnerType
-    owner_id: str
+    #: Present only when the calling application owns the resource.
+    owner_id: str | None = None
     access_kind: AccessKind
+    #: The level the user holds: `read`, or `write` which also covers `read`.
+    permission: ResourcePermission
 
 
 # Only `Allowed` carries data; a decision this SDK does not know fails validation,
@@ -131,21 +141,6 @@ type AuthorizeDecision = Allowed | Denied
 
 class _DecisionResponse(RootModel[Annotated[Allowed | Denied, Field(discriminator="decision")]]):
     model_config = ConfigDict(frozen=True)
-
-
-class AccessibleResource(ApiModel):
-    resource_id: str
-    resource_uri: str
-    scheme: str
-    display_name: str
-    application_id: str
-    application_slug: str
-    application_name: str
-    owner_type: OwnerType
-    owner_id: str
-    access_kind: AccessKind
-    #: Set when `access_kind` is `grant`.
-    grant_subject_type: GrantSubjectType | None = None
 
 
 class _AccessibleList(ApiModel):
@@ -189,8 +184,9 @@ class ResourcesApi:
 
     The decision point stays auth-service: these calls ask it, they never decide.
 
-    `resources:authorize` reaches every user and every resource of the instance, so a
-    superadmin grants it only to a trusted enforcement point. `resources:validate` is
+    `resources:authorize` is granted to an application's machine credential. Every
+    decision is taken for that application: it sees the resources it owns and the
+    ones shared with it, never everything a user owns. `resources:validate` is
     granted to new confidential applications and acts only for the resource schemes
     bound to the calling client.
     """
@@ -202,26 +198,32 @@ class ResourcesApi:
         self,
         *,
         subject_id: str,
-        client_id: str,
         resource_uri: str,
         audience: str,
+        actor_client_id: str | None = None,
+        permission: ResourcePermission | None = None,
         request_id: str | None = None,
         source: EventSource | None = None,
     ) -> AuthorizeDecision:
-        """Asks whether a user may use a resource. Needs `resources:authorize`.
+        """Asks whether a user may use a resource through the calling application.
 
-        Take `subject_id`, `client_id` and `audience` from a token you verified, never
-        from the request body. Anything other than an `Allowed` answer is a refusal,
-        and so is a raised error: fail closed. A denial carries no reason, so it
-        cannot be used to probe. `request_id` correlates the access event with your
-        own request id; `source` is recorded in the access log (`gateway` by default).
+        Needs `resources:authorize`. Take `subject_id` and `audience` from a token you
+        verified, never from the request body; the calling application is the machine
+        credential itself. Anything other than an `Allowed` answer is a refusal, and
+        so is a raised error: fail closed. A denial carries no reason, so it cannot be
+        used to probe. `permission` is the level the request needs (`read` by default,
+        `write` covers `read`); `Allowed.permission` is the level the user holds.
+        `actor_client_id` is the client the end user came through (the verified `azp`),
+        recorded in the access log only. `request_id` correlates the access event with
+        your own request id; `source` is recorded too (`gateway` by default).
         """
         try:
             body = _AuthorizeInput(
                 subject_id=subject_id,
-                client_id=client_id,
+                actor_client_id=actor_client_id,
                 resource_uri=resource_uri,
                 audience=audience,
+                permission=permission,
                 request_id=request_id,
                 source=source,
             )
@@ -233,9 +235,10 @@ class ResourcesApi:
             scope=AUTHORIZE_SCOPE,
             body={
                 "subjectId": body.subject_id,
-                "clientId": body.client_id,
                 "resourceUri": body.resource_uri,
                 "audience": body.audience,
+                **({} if body.actor_client_id is None else {"actorClientId": body.actor_client_id}),
+                **({} if body.permission is None else {"permission": body.permission}),
                 **({} if body.request_id is None else {"requestId": body.request_id}),
                 **({} if body.source is None else {"source": body.source}),
             },
@@ -246,11 +249,11 @@ class ResourcesApi:
     async def list_accessible(
         self, subject_id: str, *, scheme: str | None = None
     ) -> list[AccessibleResource]:
-        """Every validated resource a user may use, across applications.
+        """Every validated resource a user may use through the calling application.
 
-        Use it to filter a listing, never as the admission of a request: call
-        `authorize` for that. `scheme` narrows the list, e.g. `llm`. Needs
-        `resources:authorize`.
+        Each one carries the `permission` the user holds. Use it to filter a listing,
+        never as the admission of a request: call `authorize` for that. `scheme`
+        narrows the list, e.g. `llm`. Needs `resources:authorize`.
         """
         try:
             query = _AccessibleInput(subject_id=subject_id, scheme=scheme)
@@ -322,8 +325,8 @@ class ResourcesApi:
     async def record_usage(
         self,
         *,
-        subject_id: str,
-        client_id: str,
+        decision_id: str,
+        started_at: datetime,
         resource_id: str,
         resource_uri: str,
         request_id: str,
@@ -337,18 +340,23 @@ class ResourcesApi:
         """Records the usage a provider billed for a shared resource. Needs `resources:usage:write`.
 
         auth-service owns accounting; this is the only write, and the scope is granted
-        to the platform's metering components, never by default. `request_id` is the
-        event's trusted identifier (64 lowercase hex characters): replaying an event is
-        safe and answers `replayed=True`. `occurred_at` is timezone-aware, at most five
-        minutes ahead and 30 days back. `cost_usd` is a plain decimal string, required
-        for `provider` usage; `unsupported` carries no cost and no tokens. A payload
-        that conflicts with the stored event is refused (`RES_012`), and so is a caller
-        with no access to the resource (`RES_011`).
+        to the platform's metering components, never by default. `decision_id` is the
+        one `authorize` returned when it admitted the request: it names the person and
+        the application, so a usage event cannot claim another one. It lives 60 seconds
+        and only the client that obtained it may present it; `started_at` (timezone-aware)
+        is when the admitted request started and must fall within that lifetime
+        (`RES_016` otherwise). `request_id` is the event's trusted identifier (64
+        lowercase hex characters): replaying an event is safe and answers
+        `replayed=True`. `occurred_at` is timezone-aware, at most five minutes ahead and
+        30 days back. `cost_usd` is a plain decimal string, required for `provider`
+        usage; `unsupported` carries no cost and no tokens. A payload that conflicts
+        with the stored event is refused (`RES_012`), and so is a caller with no access
+        to the resource (`RES_011`).
         """
         try:
             usage = _UsageInput(
-                subject_id=subject_id,
-                client_id=client_id,
+                decision_id=decision_id,
+                started_at=started_at,
                 resource_id=resource_id,
                 resource_uri=resource_uri,
                 request_id=request_id,
@@ -366,12 +374,12 @@ class ResourcesApi:
             f"{_GATEWAY_PATH}/usage",
             scope=USAGE_SCOPE,
             body={
-                "subjectId": usage.subject_id,
-                "clientId": usage.client_id,
+                "decisionId": usage.decision_id,
+                "startedAt": to_wire_datetime(usage.started_at),
                 "resourceId": usage.resource_id,
                 "resourceUri": usage.resource_uri,
                 "requestId": usage.request_id,
-                "occurredAt": usage.occurred_at.astimezone(UTC).isoformat().replace("+00:00", "Z"),
+                "occurredAt": to_wire_datetime(usage.occurred_at),
                 "usageSource": usage.usage_source,
                 "costUsd": usage.cost_usd,
                 "promptTokens": usage.prompt_tokens,

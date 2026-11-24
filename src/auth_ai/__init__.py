@@ -50,13 +50,12 @@ from .grants import (
     MemoryGrantStore,
 )
 from .introspection import IntrospectionResult
+from .resource_types import AccessibleResource, ResourcePermission
 from .session_user import SessionUser, to_session_user
 from .sharing import (
-    AccessibleResource,
-    Audience,
+    BulkShareResult,
     Catalogue,
     CatalogueApplication,
-    DeletedResource,
     Grant,
     MemberApplication,
     Organization,
@@ -64,6 +63,7 @@ from .sharing import (
     ResourceSharingClient,
     ValidationRequest,
 )
+from .sharing_inputs import Audience
 from .transport import build_http_client
 from .types import (
     LoginHandshake,
@@ -107,9 +107,9 @@ __all__ = [
     "AuthAiErrorDetails",
     "AuthClient",
     "AuthClientConfig",
+    "BulkShareResult",
     "Catalogue",
     "CatalogueApplication",
-    "DeletedResource",
     "FeatureValue",
     "GatewayAgent",
     "GatewayAuth",
@@ -131,6 +131,7 @@ __all__ = [
     "Organization",
     "Prompt",
     "Resource",
+    "ResourcePermission",
     "ResourceSharingClient",
     "SessionUser",
     "TokenSet",

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from ..resource_types import AccessibleResource
 from .backchannel_logout import (
     BackchannelLogoutEvent,
     BackchannelLogoutHandler,
@@ -33,7 +34,6 @@ from .protected_resource import (
     protected_resource_metadata_path,
 )
 from .resources import (
-    AccessibleResource,
     Allowed,
     AuthorizeDecision,
     Denied,
@@ -43,9 +43,12 @@ from .resources import (
     UsageReceipt,
 )
 from .webhooks import (
+    ResourceDeletedEvent,
     ResourceEvent,
+    ResourceGrantEvent,
     ResourceWebhookEventType,
     WebhookApplication,
+    WebhookDeletedResource,
     WebhookGrant,
     WebhookRecipients,
     WebhookResource,
@@ -71,7 +74,9 @@ __all__ = [
     "MemoryReplayStore",
     "RecordedUsage",
     "ReplayStore",
+    "ResourceDeletedEvent",
     "ResourceEvent",
+    "ResourceGrantEvent",
     "ResourceState",
     "ResourceWebhookEventType",
     "ResourcesApi",
@@ -80,6 +85,7 @@ __all__ = [
     "UsageView",
     "VerifiedAccessToken",
     "WebhookApplication",
+    "WebhookDeletedResource",
     "WebhookGrant",
     "WebhookRecipients",
     "WebhookResource",

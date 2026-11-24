@@ -14,8 +14,53 @@ Sections, when present, appear in this order: `Added`, `Changed`, `Removed`,
 
 <!-- Add user-visible changes here. Move to a dated section at release time. -->
 
+Aligns the resource-sharing clients with application-scoped resources in auth-service: an
+application sees and uses the resources it owns or that were shared with it, never everything
+a user owns. This breaks 0.4.0 callers of the machine API and ships with the next minor release.
+
+### Added
+
+- **`permission` on grants, `"read"` or `"write"`** (closed set, type `ResourcePermission`).
+  `create_grant(permission=...)` accepts it (`read` when absent, `write` covers `read`),
+  `Grant.permission` is now typed, and `AccessibleResource.permission` carries the level the
+  user holds. An unknown value raises `CFG_001` before any request.
+- **`user.resources.update_grant(resource_id, grant_id, permission=...)`** changes the level of
+  an active grant without revoking it (`RES_014` for a level the scheme does not support,
+  `RES_015` for an inactive grant).
+- **`user.resources.delete_grant(resource_id, grant_id)`** deletes a revoked or expired grant
+  for good (`RES_020` for an active one).
+- **`user.resources.share_with_application(resource_ids, application_slug=..., permission=None,
+  expires_at=None)`** shares up to 100 resources with one application in a call and returns one
+  `BulkShareResult` per resource.
+- **`subject_type="application"`** on `create_grant`: `subject_id` is the application slug.
+- **`authorize(permission=...)`** asks for a level (`read` by default); `Allowed` carries
+  `permission`, `decision_id` and `expires_at`.
+- **Webhook events `resource.grant.updated` and `resource.deleted`.** `ResourceEvent` is now a
+  union of `ResourceGrantEvent` (with `grant.permission` and `grant.previous_permission`) and
+  `ResourceDeletedEvent` (the resource only).
+
+### Changed
+
+- **`authorize` no longer takes `client_id`.** The application asking is the machine credential;
+  pass the client the end user came through as the optional `actor_client_id`, which is
+  recorded for audit and never decides anything.
+- **`record_usage` takes `decision_id` and `started_at` instead of `subject_id` and
+  `client_id`.** The decision returned by `authorize` names the person and the application, so a
+  usage event can no longer claim either. `started_at` must fall within the decision's lifetime
+  (`RES_016` otherwise).
+- **`Allowed.owner_id` and `AccessibleResource.owner_id` are `None`** for an application that
+  does not own the resource.
+- **`list_accessible` is scoped to the calling application** on the machine and the user
+  client: it returns what the application owns or was granted, not everything a user can reach.
+- **`user.resources.delete()` deletes for good and returns the `Resource`** (it used to return
+  `DeletedResource`, with a `removed` flag, after disabling). It raises `API_001` with
+  `RES_019` while the relay still serves the model.
+- **A user bearer token is confined to its client's application**: the self-service client sees
+  that application's resources only.
+
 ### Removed
 
+- `DeletedResource` and the `use` permission value.
 - **`user.resources.get()` is removed; use `get_resource()`.** `list` is a Python builtin, so
   every SDK names its listings and lookups after their noun (`get_resource`, next to
   `list_owned` and `list_organizations`). The call and its `CFG_001` validation are unchanged.
