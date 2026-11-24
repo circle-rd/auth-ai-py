@@ -14,9 +14,11 @@ Sections, when present, appear in this order: `Added`, `Changed`, `Removed`,
 
 <!-- Add user-visible changes here. Move to a dated section at release time. -->
 
+## [0.5.0] - 2026-11-25
+
 Aligns the resource-sharing clients with application-scoped resources in auth-service: an
 application sees and uses the resources it owns or that were shared with it, never everything
-a user owns. This breaks 0.4.0 callers of the machine API and ships with the next minor release.
+a user owns. This breaks 0.4.0 callers of the machine API.
 
 ### Added
 
@@ -64,7 +66,7 @@ a user owns. This breaks 0.4.0 callers of the machine API and ships with the nex
 - **`user.resources.get()` is removed; use `get_resource()`.** `list` is a Python builtin, so
   every SDK names its listings and lookups after their noun (`get_resource`, next to
   `list_owned` and `list_organizations`). The call and its `CFG_001` validation are unchanged.
-  This breaks 0.4.0 callers and ships with the next minor release.
+  This breaks 0.4.0 callers.
 
 ### Fixed
 
@@ -214,7 +216,9 @@ wire contract and error codes.
   families (auth-service signs with ES256).
 - A server-side failure (5xx answer) of the sign-in routes is reported to `on_error`.
 
-[Unreleased]: https://github.com/circle-rd/auth-ai-py/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/circle-rd/auth-ai-py/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/circle-rd/auth-ai-py/compare/v0.4.0...v0.5.0
+[0.4.0]: https://github.com/circle-rd/auth-ai-py/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/circle-rd/auth-ai-py/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/circle-rd/auth-ai-py/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/circle-rd/auth-ai-py/releases/tag/v0.1.0
