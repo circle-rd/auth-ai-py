@@ -14,19 +14,22 @@ RESOURCE_ID = "4b1f6f3e-5a6c-4d0e-9c53-0a4c6f0f7a11"
 
 AUTHORIZE: dict[str, Any] = {
     "subject_id": "user-1",
-    "client_id": "acme-app",
+    "actor_client_id": "acme-app",
     "resource_uri": "llm://acme/gpt-x",
     "audience": "https://llm.test",
 }
 
 ALLOW = {
     "decision": "allow",
+    "decisionId": "eyJ2IjoxfQ.c2ln",
+    "expiresAt": "2026-11-18T10:01:00.000Z",
     "resourceId": RESOURCE_ID,
     "resourceUri": "llm://acme/gpt-x",
     "applicationSlug": "acme",
     "ownerType": "application",
     "ownerId": "app-1",
     "accessKind": "grant",
+    "permission": "read",
 }
 
 ITEM = {
@@ -40,6 +43,7 @@ ITEM = {
     "ownerType": "application",
     "ownerId": "app-1",
     "accessKind": "grant",
+    "permission": "read",
     "grantSubjectType": "plan",
 }
 
@@ -76,21 +80,26 @@ class TestAuthorize:
     ) -> None:
         idp.api_handler = lambda _request: json_response(ALLOW)
 
-        decision = await api.resources.authorize(**AUTHORIZE, request_id="req-1", source="api")
+        decision = await api.resources.authorize(
+            **AUTHORIZE, permission="write", request_id="req-1", source="api"
+        )
 
         assert isinstance(decision, Allowed)
+        assert decision.decision_id == "eyJ2IjoxfQ.c2ln"
         assert decision.resource_id == RESOURCE_ID
         assert decision.application_slug == "acme"
         assert decision.owner_type == "application"
         assert decision.access_kind == "grant"
+        assert decision.permission == "read"
         request = last_api_request(idp)
         assert request.method == "POST"
         assert request.url.path == "/api/internal/gateway/authorize"
         assert request.json == {
             "subjectId": "user-1",
-            "clientId": "acme-app",
+            "actorClientId": "acme-app",
             "resourceUri": "llm://acme/gpt-x",
             "audience": "https://llm.test",
+            "permission": "write",
             "requestId": "req-1",
             "source": "api",
         }
@@ -99,14 +108,30 @@ class TestAuthorize:
     async def test_sends_only_the_fields_that_are_set(self, idp: MockIdp, api: MachineApi) -> None:
         idp.api_handler = lambda _request: json_response(ALLOW)
 
-        await api.resources.authorize(**AUTHORIZE)
+        await api.resources.authorize(subject_id="user-1", resource_uri="llm://a/b", audience="x")
 
-        assert set(last_api_request(idp).json) == {
-            "subjectId",
-            "clientId",
-            "resourceUri",
-            "audience",
-        }
+        assert set(last_api_request(idp).json) == {"subjectId", "resourceUri", "audience"}
+
+    async def test_accepts_an_admission_without_an_owner(
+        self, idp: MockIdp, api: MachineApi
+    ) -> None:
+        shared = {k: v for k, v in ALLOW.items() if k != "ownerId"}
+        idp.api_handler = lambda _request: json_response(shared)
+
+        decision = await api.resources.authorize(**AUTHORIZE)
+
+        assert isinstance(decision, Allowed)
+        assert decision.owner_id is None
+
+    async def test_refuses_an_admission_with_an_unknown_permission(
+        self, idp: MockIdp, api: MachineApi
+    ) -> None:
+        idp.api_handler = lambda _request: json_response({**ALLOW, "permission": "admin"})
+
+        with pytest.raises(AuthAiError) as raised:
+            await api.resources.authorize(**AUTHORIZE)
+
+        assert raised.value.code == "API_002"
 
     async def test_returns_a_denial_without_any_reason(self, idp: MockIdp, api: MachineApi) -> None:
         idp.api_handler = lambda _request: json_response({"decision": "deny", "reason": "no_grant"})
@@ -141,7 +166,8 @@ class TestAuthorize:
         "override",
         [
             {"subject_id": ""},
-            {"client_id": ""},
+            {"actor_client_id": ""},
+            {"permission": "admin"},
             {"resource_uri": "a:"},
             {"resource_uri": "llm://" + "a" * 510},
             {"audience": ""},
@@ -182,6 +208,7 @@ class TestListAccessible:
 
         assert resources[0].resource_uri == "llm://acme/gpt-x"
         assert resources[0].grant_subject_type == "plan"
+        assert resources[0].permission == "read"
         first = last_api_request(idp)
         assert first.url.path == "/api/internal/gateway/resources/accessible"
         assert first.url.params["subjectId"] == "user/1"
@@ -346,8 +373,8 @@ RECEIPT = {
 
 def usage_record(**override: Any) -> dict[str, Any]:
     record: dict[str, Any] = {
-        "subject_id": "user-1",
-        "client_id": "gateway",
+        "decision_id": "eyJ2IjoxfQ.c2ln",
+        "started_at": datetime.now(UTC) - timedelta(seconds=2),
         "resource_id": RESOURCE_ID,
         "resource_uri": "llm://acme/gpt-x",
         "request_id": EVENT_ID,
@@ -377,6 +404,10 @@ class TestRecordUsage:
         assert request.json["costUsd"] == "0.0042"
         assert request.json["promptTokens"] == 120
         assert request.json["requestId"] == EVENT_ID
+        assert request.json["decisionId"] == "eyJ2IjoxfQ.c2ln"
+        assert "subjectId" not in request.json
+        assert "clientId" not in request.json
+        assert request.json["startedAt"].endswith("Z")
         assert request.json["occurredAt"].endswith("Z")
         assert idp.requests_to("/token")[0].form["scope"] == "resources:usage:write"
 
@@ -399,6 +430,16 @@ class TestRecordUsage:
         assert body["usageSource"] == "unsupported"
         for member in ("costUsd", "promptTokens", "completionTokens", "totalTokens"):
             assert body[member] is None
+
+    async def test_no_longer_takes_the_person_or_the_client(
+        self, idp: MockIdp, api: MachineApi
+    ) -> None:
+        with pytest.raises(TypeError):
+            await api.resources.record_usage(**usage_record(subject_id="user-1"))
+        with pytest.raises(TypeError):
+            await api.resources.record_usage(**usage_record(client_id="gateway"))
+
+        assert_no_request(idp)
 
     async def test_reports_a_replayed_event(self, idp: MockIdp, api: MachineApi) -> None:
         idp.api_handler = lambda _request: json_response({**RECEIPT, "replayed": True})
@@ -429,8 +470,8 @@ class TestRecordUsage:
     @pytest.mark.parametrize(
         "override",
         [
-            {"subject_id": ""},
-            {"client_id": ""},
+            {"decision_id": ""},
+            {"started_at": datetime.now()},
             {"resource_id": "not-a-uuid"},
             {"resource_uri": "x"},
             {"request_id": "short"},

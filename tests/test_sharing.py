@@ -4,6 +4,7 @@ from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+import httpx2
 import pytest
 
 from auth_ai import Audience, AuthAiError, ResourceSharingClient
@@ -45,7 +46,7 @@ GRANT = {
     "resourceId": RESOURCE_ID,
     "subjectType": "user",
     "subjectId": "user-2",
-    "permission": "use",
+    "permission": "read",
     "expiresAt": None,
     "revokedAt": None,
     "createdBy": "user-1",
@@ -155,6 +156,7 @@ class TestLists:
                         "ownerType": "user",
                         "ownerId": "user-1",
                         "accessKind": "grant",
+                        "permission": "write",
                         "grantSubjectType": "user",
                     }
                 ]
@@ -164,6 +166,7 @@ class TestLists:
         resources = await sharing.list_accessible(scheme="gine", application_id=APP_ID)
 
         assert resources[0].resource_uri == "gine://job-1"
+        assert resources[0].permission == "write"
         request = last_request(idp)
         assert request.url.path == "/api/user/accessible-resources"
         assert request.url.params["scheme"] == "gine"
@@ -211,12 +214,26 @@ class TestMutations:
         assert request.json == {"displayName": "Renamed", "listed": True}
 
     async def test_deletes_a_resource(self, idp: MockIdp, sharing: ResourceSharingClient) -> None:
-        idp.api_handler = lambda _request: json_response({"resource": resource(), "removed": True})
+        idp.api_handler = lambda _request: json_response({"resource": resource()})
 
         deleted = await sharing.delete(RESOURCE_ID)
 
-        assert deleted.removed is True
-        assert last_request(idp).method == "DELETE"
+        assert deleted.id == RESOURCE_ID
+        request = last_request(idp)
+        assert request.method == "DELETE"
+        assert request.url.path == f"/api/user/resources/{RESOURCE_ID}"
+
+    async def test_surfaces_the_refusal_while_the_relay_serves_the_model(
+        self, idp: MockIdp, sharing: ResourceSharingClient
+    ) -> None:
+        idp.api_handler = lambda _request: json_response(
+            {"error": {"code": "RES_019", "message": "served"}}, 409
+        )
+
+        with pytest.raises(AuthAiError) as caught:
+            await sharing.delete(RESOURCE_ID)
+
+        assert caught.value.details == {"status": 409, "apiCode": "RES_019"}
 
     async def test_creates_a_user_grant_by_email(
         self, idp: MockIdp, sharing: ResourceSharingClient
@@ -228,10 +245,40 @@ class TestMutations:
         )
 
         assert grant.id == GRANT_ID
+        assert grant.permission == "read"
         assert last_request(idp).json == {
             "subjectType": "user",
             "subjectEmail": "user@example.com",
         }
+
+    async def test_sends_the_permission_only_when_given(
+        self, idp: MockIdp, sharing: ResourceSharingClient
+    ) -> None:
+        idp.api_handler = lambda _request: json_response(
+            {"grant": {**GRANT, "permission": "write"}}, 201
+        )
+
+        grant = await sharing.create_grant(
+            RESOURCE_ID, subject_type="user", subject_id="user-2", permission="write"
+        )
+
+        assert grant.permission == "write"
+        assert last_request(idp).json == {
+            "subjectType": "user",
+            "subjectId": "user-2",
+            "permission": "write",
+        }
+
+    async def test_shares_with_an_application_by_slug(
+        self, idp: MockIdp, sharing: ResourceSharingClient
+    ) -> None:
+        idp.api_handler = lambda _request: json_response(
+            {"grant": {**GRANT, "subjectType": "application", "subjectId": "chat"}}, 201
+        )
+
+        await sharing.create_grant(RESOURCE_ID, subject_type="application", subject_id="chat")
+
+        assert last_request(idp).json == {"subjectType": "application", "subjectId": "chat"}
 
     async def test_creates_an_organization_grant(
         self, idp: MockIdp, sharing: ResourceSharingClient
@@ -260,6 +307,77 @@ class TestMutations:
         request = last_request(idp)
         assert request.method == "DELETE"
         assert request.url.path == f"/api/user/resources/{RESOURCE_ID}/grants/{GRANT_ID}"
+        assert "permanent" not in request.url.params
+
+    async def test_deletes_a_past_grant_for_good(
+        self, idp: MockIdp, sharing: ResourceSharingClient
+    ) -> None:
+        idp.api_handler = lambda _request: httpx2.Response(204)
+
+        await sharing.delete_grant(RESOURCE_ID, GRANT_ID)
+
+        request = last_request(idp)
+        assert request.method == "DELETE"
+        assert request.url.path == f"/api/user/resources/{RESOURCE_ID}/grants/{GRANT_ID}"
+        assert request.url.params["permanent"] == "true"
+
+    async def test_surfaces_the_refusal_to_delete_an_active_grant(
+        self, idp: MockIdp, sharing: ResourceSharingClient
+    ) -> None:
+        idp.api_handler = lambda _request: json_response(
+            {"error": {"code": "RES_020", "message": "active"}}, 409
+        )
+
+        with pytest.raises(AuthAiError) as caught:
+            await sharing.delete_grant(RESOURCE_ID, GRANT_ID)
+
+        assert caught.value.details == {"status": 409, "apiCode": "RES_020"}
+
+    async def test_changes_the_level_of_a_grant_without_revoking_it(
+        self, idp: MockIdp, sharing: ResourceSharingClient
+    ) -> None:
+        idp.api_handler = lambda _request: json_response(
+            {"grant": {**GRANT, "permission": "write"}}
+        )
+
+        grant = await sharing.update_grant(RESOURCE_ID, GRANT_ID, permission="write")
+
+        assert grant.permission == "write"
+        request = last_request(idp)
+        assert request.method == "PATCH"
+        assert request.url.path == f"/api/user/resources/{RESOURCE_ID}/grants/{GRANT_ID}"
+        assert request.json == {"permission": "write"}
+
+    async def test_shares_several_resources_with_an_application(
+        self, idp: MockIdp, sharing: ResourceSharingClient
+    ) -> None:
+        results = [
+            {"resourceId": RESOURCE_ID, "grantId": GRANT_ID, "code": None},
+            {"resourceId": APP_ID, "grantId": None, "code": "RES_014"},
+        ]
+        idp.api_handler = lambda _request: json_response({"results": results})
+        expires_at = datetime.now(UTC) + timedelta(days=1)
+
+        outcome = await sharing.share_with_application(
+            [RESOURCE_ID, APP_ID],
+            application_slug="chat",
+            permission="write",
+            expires_at=expires_at,
+        )
+
+        assert [(r.resource_id, r.grant_id, r.code) for r in outcome] == [
+            (RESOURCE_ID, GRANT_ID, None),
+            (APP_ID, None, "RES_014"),
+        ]
+        request = last_request(idp)
+        assert request.method == "POST"
+        assert request.url.path == "/api/user/resource-shares"
+        assert request.json == {
+            "resourceIds": [RESOURCE_ID, APP_ID],
+            "applicationSlug": "chat",
+            "permission": "write",
+            "expiresAt": expires_at.isoformat().replace("+00:00", "Z"),
+        }
 
 
 class TestValidation:
@@ -267,7 +385,7 @@ class TestValidation:
         self, idp: MockIdp, sharing: ResourceSharingClient
     ) -> None:
         with pytest.raises(AuthAiError) as caught:
-            await sharing.get("not-a-uuid")
+            await sharing.get_resource("not-a-uuid")
 
         assert caught.value.code == "CFG_001"
         assert idp.requests == []
@@ -295,6 +413,63 @@ class TestValidation:
                 subject_type="user",
                 subject_id="user-2",
                 expires_at=datetime.now(UTC) - timedelta(minutes=1),
+            )
+
+        assert caught.value.code == "CFG_001"
+        assert idp.requests == []
+
+    @pytest.mark.parametrize("permission", ["admin", "use", ""])
+    async def test_refuses_a_permission_outside_the_closed_set(
+        self, idp: MockIdp, sharing: ResourceSharingClient, permission: str
+    ) -> None:
+        with pytest.raises(AuthAiError) as create:
+            await sharing.create_grant(
+                RESOURCE_ID,
+                subject_type="user",
+                subject_id="user-2",
+                permission=permission,  # type: ignore[arg-type]
+            )
+        with pytest.raises(AuthAiError) as update:
+            await sharing.update_grant(
+                RESOURCE_ID,
+                GRANT_ID,
+                permission=permission,  # type: ignore[arg-type]
+            )
+
+        assert create.value.code == "CFG_001"
+        assert update.value.code == "CFG_001"
+        assert idp.requests == []
+
+    async def test_refuses_an_application_grant_without_a_slug(
+        self, idp: MockIdp, sharing: ResourceSharingClient
+    ) -> None:
+        with pytest.raises(AuthAiError) as caught:
+            await sharing.create_grant(RESOURCE_ID, subject_type="application")
+
+        assert caught.value.code == "CFG_001"
+        assert idp.requests == []
+
+    @pytest.mark.parametrize(
+        ("resource_ids", "slug", "expires_at"),
+        [
+            ([], "chat", None),
+            ([RESOURCE_ID] * 101, "chat", None),
+            (["nope"], "chat", None),
+            ([RESOURCE_ID], " ", None),
+            ([RESOURCE_ID], "chat", datetime.now(UTC) - timedelta(minutes=1)),
+        ],
+    )
+    async def test_refuses_an_invalid_bulk_share(
+        self,
+        idp: MockIdp,
+        sharing: ResourceSharingClient,
+        resource_ids: list[str],
+        slug: str,
+        expires_at: datetime | None,
+    ) -> None:
+        with pytest.raises(AuthAiError) as caught:
+            await sharing.share_with_application(
+                resource_ids, application_slug=slug, expires_at=expires_at
             )
 
         assert caught.value.code == "CFG_001"

@@ -5,12 +5,13 @@ import hmac
 import json
 import time
 from datetime import datetime
-from typing import TYPE_CHECKING, Final, Literal
+from typing import TYPE_CHECKING, Annotated, Final, Literal
 
-from pydantic import ValidationError
+from pydantic import Field, TypeAdapter, ValidationError
 
 from ..errors import ERR
 from ..http import ApiModel
+from ..resource_types import GrantSubjectType, OwnerType, ResourcePermission, ResourceStatus
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -18,7 +19,12 @@ if TYPE_CHECKING:
 _HEADER: Final = "x-auth-service-signature"
 _DEFAULT_TOLERANCE_SECONDS: Final = 300
 
-type ResourceWebhookEventType = Literal["resource.grant.created", "resource.grant.revoked"]
+type ResourceWebhookEventType = Literal[
+    "resource.grant.created",
+    "resource.grant.revoked",
+    "resource.grant.updated",
+    "resource.deleted",
+]
 
 
 class WebhookApplication(ApiModel):
@@ -26,20 +32,27 @@ class WebhookApplication(ApiModel):
     slug: str
 
 
-class WebhookResource(ApiModel):
+class WebhookDeletedResource(ApiModel):
     id: str
     uri: str
     scheme: str
     display_name: str
-    owner_type: Literal["user", "application"]
-    owner_id: str
-    status: str
+    owner_type: OwnerType
+    #: Present only for the application that owns the resource.
+    owner_id: str | None = None
+
+
+class WebhookResource(WebhookDeletedResource):
+    status: ResourceStatus
 
 
 class WebhookGrant(ApiModel):
     id: str
-    subject_type: Literal["user", "organization", "plan", "everyone"]
+    subject_type: GrantSubjectType
     subject_id: str | None = None
+    permission: ResourcePermission
+    #: Set on `resource.grant.updated`.
+    previous_permission: ResourcePermission | None = None
     expires_at: datetime | None = None
 
 
@@ -49,16 +62,34 @@ class WebhookRecipients(ApiModel):
     all_members: bool = False
 
 
-class ResourceEvent(ApiModel):
-    """A signed resource-sharing event delivered by auth-service."""
+class ResourceGrantEvent(ApiModel):
+    """A grant was created, revoked or had its level changed."""
 
     event_id: str
-    type: ResourceWebhookEventType
+    type: Literal["resource.grant.created", "resource.grant.revoked", "resource.grant.updated"]
     occurred_at: datetime
     application: WebhookApplication
     resource: WebhookResource
     grant: WebhookGrant
     recipients: WebhookRecipients
+
+
+class ResourceDeletedEvent(ApiModel):
+    """A resource is gone, with its grants. It carries the resource only."""
+
+    event_id: str
+    type: Literal["resource.deleted"]
+    occurred_at: datetime
+    application: WebhookApplication
+    resource: WebhookDeletedResource
+
+
+#: A signed resource-sharing event delivered by auth-service.
+type ResourceEvent = ResourceGrantEvent | ResourceDeletedEvent
+
+_EVENT_ADAPTER: Final[TypeAdapter[ResourceEvent]] = TypeAdapter(
+    Annotated[ResourceGrantEvent | ResourceDeletedEvent, Field(discriminator="type")]
+)
 
 
 def verify_resource_event(
@@ -113,7 +144,7 @@ def verify_resource_event(
     except ValueError as err:
         raise ERR.REQ_001("Webhook body is not valid JSON", cause=err) from err
     try:
-        return ResourceEvent.model_validate(payload)
+        return _EVENT_ADAPTER.validate_python(payload)
     except ValidationError as err:
         raise ERR.REQ_001("Webhook body has an unexpected shape", cause=err) from err
 
