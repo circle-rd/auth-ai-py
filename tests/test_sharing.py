@@ -267,7 +267,7 @@ class TestValidation:
         self, idp: MockIdp, sharing: ResourceSharingClient
     ) -> None:
         with pytest.raises(AuthAiError) as caught:
-            await sharing.get("not-a-uuid")
+            await sharing.get_resource("not-a-uuid")
 
         assert caught.value.code == "CFG_001"
         assert idp.requests == []

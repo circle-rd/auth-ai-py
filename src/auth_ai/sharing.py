@@ -334,7 +334,7 @@ class ResourceSharingClient:
         )
         return response.resources
 
-    async def get(self, resource_id: str) -> Resource:
+    async def get_resource(self, resource_id: str) -> Resource:
         await self._validate_id(resource_id, "resource id")
         response = await self._http.request(
             "GET",

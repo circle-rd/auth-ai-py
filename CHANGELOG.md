@@ -14,6 +14,13 @@ Sections, when present, appear in this order: `Added`, `Changed`, `Removed`,
 
 <!-- Add user-visible changes here. Move to a dated section at release time. -->
 
+### Removed
+
+- **`user.resources.get()` is removed; use `get_resource()`.** `list` is a Python builtin, so
+  every SDK names its listings and lookups after their noun (`get_resource`, next to
+  `list_owned` and `list_organizations`). The call and its `CFG_001` validation are unchanged.
+  This breaks 0.4.0 callers and ships with the next minor release.
+
 ### Fixed
 
 - Documentation: the back-channel logout endpoint answers `200`, not `204`, when the
